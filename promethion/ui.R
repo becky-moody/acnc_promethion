@@ -6,6 +6,8 @@
 #
 #    http://shiny.rstudio.com/
 #
+options(scipen = 999)
+
 if (!require("pacman")) {
   install.packages("pacman") }
 library(pacman)
@@ -23,92 +25,99 @@ pacman::p_unload(here, janitor, readxl, tools)
 time_selection <- format( seq.POSIXt(as.POSIXct('2021-01-01 00:00'),
                                      as.POSIXct('2021-01-01 23:59'), by = "30 min"),"%H:%M")
 
+#rmarkdown::render(here::here("www/example_promethion.Rmd"))
+note_html <- base64enc::dataURI(file = here::here("www/example_promethion.html"), mime = "text/html")
+
+
 # Define UI for application that draws a histogram
-shinyUI(fluidPage(
+shinyUI(
+tagList(
+  shinyjs::useShinyjs(),
 
-  useShinyjs(),
-    # Application title
-    titlePanel("Promethion Data Editor"),
+  navbarPage('Promethion', id = 'promethion_app',
 
-    # Sidebar with a slider input for number of bins
-    sidebarLayout(
-      sidebarPanel(width = 3,
-                   div(style = "margin:auto",
-                   ## promethion files
-                   fileInput("prom_file",
-                             HTML(paste(
-                               h3("Choose Promethion Files"),
-                               h6("If file is .xml, open in Excel and save as .xlsx.", style = "font-size:12px;"))),
-                             accept = c(
-                               # "text/csv",
-                               # "text/comma-separated-values,text/plain",
-                               ".csv",
-                               '.xlsx'),
-                             multiple = TRUE
-                   ),
+             source(here::here('tabs/data_editor_ui.R'), local = TRUE)$value,
+
+tabPanel('Plot Data',
+         sidebarPanel(width = 3,
+
+                      # show correct header if there is data or not
+                      div(id='no_data_warning',h2('Please upload data.')),
+                      div(id='filter_tab_name',h2('Apply Filters')),
+
+                      # choose column with subject ids
+                      shinyWidgets::pickerInput(
+                        inputId = 'which_column_subject_id',
+                        label = 'Which column in data contains subject ids?',
+                         choices =  character(0),
+                          selected = character(0),
+                          options = list(`actions-box` = TRUE,
+                                         `live-search`=TRUE),
+                          multiple = FALSE
+                        ),
+
+                      div(id = 'all_plot_filters',
+          tags$hr(style="border-color: black;"),
+          br(),
+          shinyWidgets::pickerInput(inputId = 'plot_animal_filter',
+                                    label = HTML(paste(
+                                      h4('Which subject(s)?',style = "display: inline;"))),
+                                    choices =  character(0),
+                                    selected = character(0),
+                                    options = list(
+                                      `actions-box` = TRUE,
+                                      `live-search`=TRUE),
+                                    multiple = TRUE
+          ),
+
+          ## this update dropdown is in data_editor_server.R
+          shinyWidgets::pickerInput(inputId = 'plot_metric_filter',
+                                    label = HTML(paste(
+                                      h4('Which metric?',style = "display: inline;"),
+                                      h6(em("'_diff' metrics are the change between time."),style = "display: inline;"))),
+                                    choices =  character(0),
+                                    selected = character(0),
+                                    options = list(
+                                      `actions-box` = TRUE,
+                                      `live-search`=TRUE),
+                                    multiple = FALSE
+          ),
+
+          shinyWidgets::pickerInput(inputId = 'plot_phase_filter',
+                                    label = HTML(paste(
+                                      h4('Which light/dark phase?',style = "display: inline;"))),
+                                    choices =  character(0),
+                                    selected = character(0),
+                                    options = list(
+                                      `actions-box` = TRUE,
+                                      `live-search`=TRUE),
+                                    multiple = TRUE
+          ),
+          tags$hr(style="border-color: black;")
+          ),
+
+          actionButton(
+            inputId = "plot_selected",
+            label = "Plot selected", width = '100%'),
+          br(),
 
 
-                   fileInput("animal_file",
-                        HTML(paste(
-                   h3("Choose Study Metadata File"),
-                   h6(em('This file must be formatted.'),style = "font-size:12px;")
-                   )),
-                             accept = c(
-                               # "text/csv",
-                               # "text/comma-separated-values,text/plain",
-                               ".csv",
-                               '.xlsx'),
-                             multiple = FALSE
-                   ),
-                   br(),
-                   selectInput(inputId = 'agg_data',
-                    label = 'Aggregate data? (Currently every 5 minutes)',
-                               choices = c('5 min' = 5, '30 min'=30,
-                                           '1 hr'= 60, '5 hrs'= 300),
-                               selected = c('5 min'),
-                               multiple = FALSE
-                   ),
-                   actionButton(
-                     inputId = "upload_files_btn",
-                     label = "Upload files?", width = '100%'),
-                   ),
 
-                   ## line
-                   tags$hr(style="border-color: black;"),
+          mainPanel(width = 9,
 
+                    #plotOutput("distPlot")
+          )
 
-        shinyjs::hidden(p(id = "st_lg",
-                   selectInput(inputId = 'start_light',
-                          label = 'What time was the light turned on?',
-                               choices = time_selection,
-                               selected = c('07:00'),
-                               multiple = FALSE,
-                               #options = list(style = 'background-color:#FFF68F;') # I cant get this to work will need to set css
-                               #choicesOpt=list(rep_len('background:#FFF68F;',length(time_selection)))
-                   ))),
-        shinyjs::hidden(p(id = "end_lg",
-                          selectInput(inputId = 'end_light',
-                               label = 'What time was the light turned off?',
-                               choices = time_selection,
-                               selected = c('19:00'),
-                               multiple = FALSE,
-                               #choicesOpt = list(style = rep_len('background:#8DEEEE;',length(time_selection)))
-                   ))),
-      shinyjs::hidden(p(id = "ph",
-                        br(),
-                        actionButton(
-                     inputId = "calc_phases",
-                     label = "Calculate light/dark phases?",
-                     width = '100%'),
-                   br())),
+         )# end sidebarpanel
+         ),# end tabpanel
+tabPanel('Example',
+         fluidPage(
+         #htmltools::includeHTML(here::here('md/example_promethion.html'))
+         htmltools::tags$iframe(src = note_html, width = '100%',  height = 1000,  style = "border:none;")
+         )
+         )
 
-                   shinyjs::hidden(p(id = "dl",
-                    br(), actionButton("download_data", "Download files?")
-                   ))
-      ),
-        # Show a plot of the generated distribution
-        mainPanel(width = 9,
-            #plotOutput("distPlot")
-        )
-    )
-))
+)# end navbarpage
+
+) # end ui
+)

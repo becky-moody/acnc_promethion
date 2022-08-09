@@ -2,108 +2,79 @@ library(shiny)
 
 
 # Define server logic required to draw a histogram
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
   ## Has a bunch of functions that will be needed
-  source(here::here('scripts/clean_promethion_file.R'))
+  #source(here::here('scripts/clean_promethion_file.R'))
 
+  source(here::here('tabs/data_editor_server.R'), local = TRUE)
 
+  ## only show anything if you click on this tab
+  observeEvent(input$promethion_app == 'Plot Data',{
 
+    ## hide/show sidebar items
+    if(is.null(final_df())){
 
-  # # text outputs
-  # output$meta_note <- renderText('Note: This file must be formatted prior to uploading.')
+      message('Need data uploaded.')
+      shinyjs::show(id='no_data_warning')
 
+      shinyjs::hide(id='filter_tab_name')
+      shinyjs::hide(id="which_column_subject_id")
 
-  # # get start/stop time ----
-  # start_light <- hms::as_hms('7:15:00') # inclusive
-  # end_light <- hms::as_hms('19:00:00') # make sure the user put the hour that the light stopped aka when did dark start
-  light_colors <- c(light = "#FFF68F", dark = "#8DEEEE")
+      shinyjs::hide(id='all_plot_filters')
+      ## grouped these
+      # shinyjs::hide(id="plot_metric_filter")
+      # shinyjs::hide(id='plot_animal_filter')
+      # shinyjs::hide(id="plot_phase_filter")
 
-  # get promethion data paths ----
+      shinyjs::hide(id="plot_selected")
 
-  meta_df <- data.frame()
-  final_df <- data.frame()
+    } else{
 
-  # read meta data file ----
-  observeEvent(input$animal_file,{
-    if(is.null(input$animal_file)){
-      meta_df <<- NULL
-      return(NULL)
-    }
-    req(input$animal_file)
-    meta_df <<- read.input.file(input$animal_file$datapath) %>%
-      janitor::clean_names()
+      shinyjs::hide(id='no_data_warning')
 
-    cat('\n meta data file \n')
-    print(head(meta_df, 2))
-  })
-#
-  # observe({
-  #   shinyjs::toggleElement("st_lg", condition = input$files_upload>0)
-    #shinyjs::toggle("end_lg", condition = input$upload_files>0)
-    #shinyjs::toggle("ph", condition = input$upload_files>0)
-  # })
-
-  observeEvent(input$upload_files_btn, {
-    shinyjs::show("st_lg")
-        #shinyjs::toggle("end_lg")
-        #shinyjs::toggle("ph")
-  })
-
-  observe({
-    shinyjs::toggle("dl", condition = input$calc_phases>0)
-  })
-
-
-  observeEvent(input$files_upload,ignoreInit = TRUE,{
-    print('\n running promethion \n')
-    if(is.null(input$prom_file)){
-      return(NULL)
-    }
-    prom_file_paths <- list()
-    for(i in 1:nrow(input$prom_file)){
-      prom_file_paths[i] <- input$prom_file$datapath[i]
+      shinyjs::show(id='filter_tab_name')
+      shinyjs::show(id="which_column_subject_id")
+      shinyjs::show(id='all_plot_filters')
     }
 
-    cat('\n promethion file paths \n')
-    print(prom_file_paths)
+    req(!is.null(final_df()))
+    final_df_cols <- colnames(final_df())
+    ## if there are column names (could change this to if final_df is null)
+    #if(!is.null(final_df_cols)){
 
-    req(prom_file_paths)
-    req(meta_df)
+      ## show and update phase filter if the light_dark col has been calculated
+      if('light_dark' %in% final_df_cols){
+        shinyjs::show(id='plot_phase_filter')
+        final_df_phases <- unique(final_df()$phase)
+        shinyWidgets::updatePickerInput(session,
+                                        "plot_phase_filter",
+                                        choices = c(final_df_phases),
+                                        selected = character(0))
+      }
 
-    prom_df <- join.cage.files(prom_file_paths)
+      ## update column selections for subject ids
+      shinyWidgets::updatePickerInput(session,
+                                      "which_column_subject_id",
+                                      # label = "download_data_col",
+                                      choices = c(final_df_cols),
+                                      selected = character(0))
 
-    df <- left_join(prom_df, meta_df, by = c('cage_num', 'run')) %>%
-      ## remove anything where there is not an animal_id
-      drop_na(subject_id)
-    final_df <<- df
-    print(head(final_df,2))
+      ## show and update subject id selections after choosing col
+      observeEvent(input$which_column_subject_id,{
+        shinyjs::show(id="plot_animal_filter")
+        sub_ids <- unique(final_df()[input$which_column_subject_id])
+        shinyWidgets::updatePickerInput(session,
+                                        "plot_animal_filter",
+                                        # label = "download_data_col",
+                                        choices = c(sub_ids),
+                                        selected = character(0))
+      })
 
-  })
-
-  df_phases <- eventReactive(input$calculate_phases,{
-    cat('\n adding in phases \n')
-    df <- add.phases(df, input$start_light, input$end_light)
-    final_df <<- df
-
-  })
-
-  # agg_df <- eventReactive(!is_empty(final_df),{
-  #   req(input$agg_data)
-  #
-  #   df <- final_df
-  #   df <- df %>% group_by()
-  #
-  # })
+   # }
 
 
-  ## download as csv
-  output$download_data <- downloadHandler(
-    filename = function() {
-      paste("promethion_cleaned",Sys.Date(), ".csv", sep = "")
-    },
-    content = function(file) {
-      write.csv(df_phases(), file, row.names = FALSE, col.names =TRUE)
-    }
-  )
+  }, ignoreInit = TRUE)
+
+
 
 })
