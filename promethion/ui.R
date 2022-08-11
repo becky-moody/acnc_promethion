@@ -12,8 +12,8 @@ if (!require("pacman")) {
   install.packages("pacman") }
 library(pacman)
 
-pacman::p_load(shiny, tidyverse,here, janitor, shinyjs, readxl, DT, tools, update = FALSE)
-pacman::p_unload(here, janitor, readxl, tools)
+pacman::p_load(shiny, tidyverse,here, janitor, shinyjs, readxl, DT, tools,shinyWidgets, update = FALSE)
+pacman::p_unload(here, janitor, readxl, tools,shinyWidgets)
 # library(shiny)
 # library(tidyverse)
 # library(here)
@@ -21,6 +21,10 @@ pacman::p_unload(here, janitor, readxl, tools)
 # library(shinyjs)
 # library(readxl)
 # library(DT)
+# detach(here)
+# detach(janitor)
+# detach(readxl)
+# detach(shinyWidgets)
 
 time_selection <- format( seq.POSIXt(as.POSIXct('2021-01-01 00:00'),
                                      as.POSIXct('2021-01-01 23:59'), by = "30 min"),"%H:%M")
@@ -40,11 +44,11 @@ tagList(
 
 tabPanel('Plot Data',
          sidebarPanel(width = 3,
-
+####################################################-
                       # show correct header if there is data or not
                       div(id='no_data_warning',h2('Please upload data.')),
                       div(id='filter_tab_name',h2('Apply Filters')),
-
+####################################################-
                       # choose column with subject ids
                       shinyWidgets::pickerInput(
                         inputId = 'which_column_subject_id',
@@ -55,10 +59,9 @@ tabPanel('Plot Data',
                                          `live-search`=TRUE),
                           multiple = FALSE
                         ),
-
+####################################################-
                       div(id = 'all_plot_filters',
           tags$hr(style="border-color: black;"),
-          br(),
           shinyWidgets::pickerInput(inputId = 'plot_animal_filter',
                                     label = HTML(paste(
                                       h4('Which subject(s)?',style = "display: inline;"))),
@@ -95,21 +98,25 @@ tabPanel('Plot Data',
           ),
           tags$hr(style="border-color: black;")
           ),
-
+####################################################-
           actionButton(
             inputId = "plot_selected",
             label = "Plot selected", width = '100%'),
-          br(),
+        shinyWidgets::progressBar(id = "plot_filter_progress", value = 0, striped = TRUE),
+          br()
+), # end sidebarpanel
 
 
-
+####################################################-
           mainPanel(width = 9,
-
+                    plotOutput('filtered_prom_plot')
                     #plotOutput("distPlot")
           )
 
-         )# end sidebarpanel
+
          ),# end tabpanel
+
+####################################################-
 tabPanel('Example',
          fluidPage(
          #htmltools::includeHTML(here::here('md/example_promethion.html'))

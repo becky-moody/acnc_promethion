@@ -1,5 +1,3 @@
-# initialize variables ----
-final_df <- reactiveVal()
 
 # press aggregate_data_btn to read, clean, join files ----
 observeEvent(input$aggregate_data_btn,{
@@ -12,7 +10,7 @@ observeEvent(input$aggregate_data_btn,{
 
   if(input$auto_file_selection == TRUE){
     #final_df(readxl::read_xlsx(here::here('data/promethion_cleaned_5minutes_2022-07-26.xlsx')))
-    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-05.csv'))
+    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-10.csv'))
     final_df(df)
 
     metrics <- unique(df$metric)
@@ -22,11 +20,6 @@ observeEvent(input$aggregate_data_btn,{
                                     # label = "download_data_col",
                                     choices = c(metrics))
 
-    shinyWidgets::updatePickerInput(session,
-                                    "plot_col_filter",
-                                    # label = "download_data_col",
-                                    choices = c(metrics),
-                                    selected = character(0))
 
 
   } else{
@@ -45,7 +38,7 @@ observeEvent(input$aggregate_data_btn,{
       # loop through however many promethion files are uploaded;
       # input$prom_file is a list of all selected files
       for(i in 1:n_prom_files){
-        incProgress(i/progress_denominator, detail = paste("Starting file", i))
+        incProgress(1/progress_denominator, detail = paste("Starting file", i))
         ### check file format
         # get file extension so use the correct read function
         ext <- tools::file_ext(input$prom_file$name[i])
@@ -62,7 +55,7 @@ observeEvent(input$aggregate_data_btn,{
         # dat <- read.csv('example data/example_prom2_for_testing_app.csv')
         # i=1
         # meta_dat <- readxl::read_xlsx('example data/example_metadata.xlsx')
-        # agg_by <- '6 hours'
+        # agg_by <- '30 minutes'
         ####################################
 
         ## file has been read, start cleaning
@@ -94,8 +87,7 @@ observeEvent(input$aggregate_data_btn,{
           mutate(start_date =  min(date_time, na.rm = TRUE),
                  end_date = max(date_time, na.rm = TRUE)) %>%
           ungroup()
-        progress_next <- i+1
-        incProgress(progress_next/progress_denominator, detail = paste("Finished with file", i))
+        incProgress(1/progress_denominator, detail = paste("Finished with file", i))
         ### rbind each 'cleaned' prometion file to df
         # add to cage df; new rows = next file
         all_cage <- rbind(all_cage, cage_file)
@@ -103,7 +95,7 @@ observeEvent(input$aggregate_data_btn,{
 
 
       message('Finished with upload, reading, pivoting, and joining promethion files.')
-      incProgress(progress_denominator/progress_denominator, detail = 'Calculating run column')
+      incProgress(1/progress_denominator, detail = 'Calculating run column')
       ## get 'run' of prometion based on date
 
       # create a run column which will be used to join to meta data
@@ -150,7 +142,7 @@ observeEvent(input$aggregate_data_btn,{
       req_cols <- c('run'='run number','run'='Run',
                     'cage_num'='cage','cage_num'='cage num','cage_num'='cage_number','cage_num'='cage number',
                     'meta_date'='date','meta_date'='start_date','meta_date'='')
-      incProgress(2/3, detail = 'Renaming columns')
+      incProgress(1/3, detail = 'Renaming columns')
       meta_df_c <- meta_df %>% rename(any_of(req_cols))
 
       if(!('run' %in% colnames(meta_df_c)) & length(input$prom_file$name) == 1){
@@ -159,7 +151,7 @@ observeEvent(input$aggregate_data_btn,{
 
       validate(need('run' %in% colnames(meta_df_c),"Meta data file must include a 'run' column."))
       validate(need('cage_num' %in% colnames(meta_df_c),"Meta data file must include a 'cage_num' column."))
-      incProgress(2.75/3, detail = 'Join with promethion file(s).')
+      incProgress(1/3, detail = 'Join with promethion file(s).')
       # join meta data and cage data; if missing meta then it's out
       df <- inner_join(all_cage, meta_df_c,
                        by = c('run','cage_num'))
@@ -191,6 +183,7 @@ observeEvent(input$aggregate_data_btn,{
         # get aggregated time intervals;
         mutate(date_time = cut(date_time, agg_breaks[agg_by]),
                date_time = as.POSIXct(date_time))
+
       incProgress(1/3, detail = paste0('Breaking datetimes by ',agg_breaks[agg_by],'.'))
       # exclude missing
 
@@ -207,10 +200,10 @@ observeEvent(input$aggregate_data_btn,{
                                       max(raw_n, na.rm=TRUE),
                                     TRUE ~ mean(raw_n, na.rm = TRUE))) %>%
         ungroup()
-      incProgress(2/3, detail = 'Calculating differences.')
+      incProgress(1/3, detail = 'Calculating differences.')
 
       ## create one lag differences for all variables ----
-      diff_df <- agg_df %>% filter(cage_num %in% c(1,2)) %>%
+      diff_df <- agg_df %>%
         group_by( start_date, end_date,
                   file_num_uploaded, across(colnames(meta_df_c)), metric, cage_num) %>%
         arrange(date_time) %>%
@@ -227,7 +220,7 @@ observeEvent(input$aggregate_data_btn,{
         rename('metric'='diff_metric','value'='diff')
 
 
-      incProgress(2.75/3, detail = 'Finished with aggregation. Formatting columns.')
+      incProgress(1/3, detail = 'Finished with aggregation. Formatting columns.')
       ## join everything, large df
       aggregated_df <- rbind(agg_df, diff_df) %>%
         ungroup() %>% arrange(metric, run, cage_num, date_time) %>%
@@ -276,6 +269,7 @@ observeEvent(input$calc_phases_btn,{
   req(input$start_light)
   req(input$end_light)
 
+
   start_light <- hms::as_hms(paste0(input$start_light,':00')) # inclusive
   end_light <- hms::as_hms(paste0(input$end_light,':00')) # make sure the user put the hour that the light stopped aka when did dark start
 
@@ -293,11 +287,12 @@ observeEvent(input$calc_phases_btn,{
             (hms::as_hms(date_time) < end_light),
           1, 0),
         ## will need this later
-        start_in_light = ifelse(date_time == start_date, 1, 0))
-    incProgress(2/3, detail = 'still working')
+        start_in_light = ifelse((date_time == start_date) & (light_on ==1), 1, 0))
+    incProgress(1/3, detail = 'still working')
     df_with_phases <- df_with_phases %>%
       group_by(run, cage_num, metric) %>%
       arrange(run, cage_num, metric, date_time) %>%
+      ## this is a mess but it works...
       mutate(## fill in start with NA and replace it with 0; find difference between the current and lag light change; ex:
         # 1,0,0, 1+0=1,
         # 1,0,0, 1+0+0 = 1
@@ -307,28 +302,32 @@ observeEvent(input$calc_phases_btn,{
         # 1,1,1, 1+1+0
         light_change = replace_na(c(NA, diff(light_on)),0),
         ## next ifelse only works if the starts with light on; if it starts with off then reverse signs
-        light_change = ifelse(start_in_light== 1, light_change, -light_change),
+        #light_change = ifelse(start_in_light == 1, -light_change, light_change),
+
+        total_phase_num =1+ cumsum(abs(light_change)),
         ## this will be used
-        i = ifelse(light_change == -1, 1, 0),
-        phase_num = 1+cumsum(i)
+        i = ifelse(light_change == 1, 1, 0),
+        phase_num = 1+cumsum(i),
+        phase_num = ifelse(any(start_in_light == 0) & light_on == 1, phase_num -1, phase_num),
+        phase_num = ifelse((any(phase_num == 0) & light_on ==1),phase_num+1,phase_num)
       ) %>%
       ungroup() %>%
       ## zero question what the columns are; will use for plotting
       mutate(light_dark = ifelse(light_on == 1, 'light','dark'),
-             phase = paste0(light_dark, ' phase ', phase_num)) %>%
+             phase = paste0(light_dark, ' phase ', phase_num))%>%
       ## don't need these anymore
       select(-light_change, - i, -start_in_light) %>%
       mutate(across(contains('date'), as.character)) %>%
       relocate(phase, .after =  value)
 
-    incProgress(3/3, detail = 'finished')
+    incProgress(1/3, detail = 'finished')
 
   })
 
   ## replace final_df with prom with light/dark
   final_df(df_with_phases)
 
-})
+  })
 
 # output head of table ----
 output$all_prom_files <- DT::renderDataTable(head(final_df()),
@@ -338,14 +337,16 @@ output$all_prom_files <- DT::renderDataTable(head(final_df()),
 ## cannot add light/dark if aggregated above 30 minutes
 observeEvent(input$aggregate_data_btn, {
   if(input$aggregate_data_btn >0 & input$aggregate_data %in% c('5 minutes', '30 minutes')){#%% 2 == 1 | is.null(input$aggregate_data_btn)){
-    shinyjs::show(id="start_light")
-    shinyjs::show(id="end_light")
-    shinyjs::show(id ='calc_phases_btn')
+    # shinyjs::show(id="start_light")
+    # shinyjs::show(id="end_light")
+    # shinyjs::show(id ='calc_phases_btn')
+    shinyjs::show(id='phase_ui')
 
   }else{
-    shinyjs::hide(id="start_light")
-    shinyjs::hide(id="end_light")
-    shinyjs::hide(id = 'calc_phases_btn')
+    # shinyjs::hide(id="start_light")
+    # shinyjs::hide(id="end_light")
+    # shinyjs::hide(id = 'calc_phases_btn')
+    shinyjs::hide(id='phase_ui')
 
   }
 }, ignoreNULL = FALSE)

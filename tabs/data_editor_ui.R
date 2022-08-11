@@ -57,6 +57,7 @@ tabPanel(
                  label = "Upload files and aggregate?", width = '100%'),
                br(),
 
+               div(id = 'phase_ui',
                tags$hr(style="border-color: black;"),
                br(),
                selectInput(inputId = 'start_light',
@@ -80,7 +81,7 @@ tabPanel(
                  width = '100%'),
 
                tags$hr(style="border-color: black;"),
-
+),
                br(),
                shinyWidgets::pickerInput(inputId = 'download_data_col',
                                          label = HTML(paste(
