@@ -59,14 +59,25 @@ tabPanel('Plot Data',
                         inputId = "plot_selected",
                         label = "Plot selected", width = '100%'),
                       shinyWidgets::progressBar(id = "plot_filter_progress", value = 0, striped = TRUE),
-                      br()
+                      br(),
+                      div(id = 'outliers_plot',
+                          h4('Would you like to see outliers?'),
+                          p('Details on calculations found in the Example tab.'),
+                          actionButton(
+                            inputId = 'calculate_outliers',
+                            label = 'Calculate outliers and redo plot.',
+                            width = '100%'
+                          )
+
+
+                          )
          ), # end sidebarpanel
 
 
          ####################################################-
          mainPanel(width = 9,
-                   plotOutput('filtered_prom_plot')
-                   #plotOutput("distPlot")
+                   #plotOutput('filtered_prom_plot')
+                   plotly::plotlyOutput('filtered_prom_plot')
          )
 
 

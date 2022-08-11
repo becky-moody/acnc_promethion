@@ -19,6 +19,8 @@ observeEvent(input$promethion_app == 'Plot Data',{
     shinyjs::hide(id="plot_selected")
     shinyjs::hide(id="plot_filter_progress")
 
+    shinyjs::hide(id='outliers_plot')
+
   } else{
 
     shinyjs::hide(id='no_data_warning')
@@ -29,6 +31,9 @@ observeEvent(input$promethion_app == 'Plot Data',{
 
     shinyjs::show(id='plot_selected')
     shinyjs::hide(id="plot_filter_progress")
+
+    shinyjs::hide('outliers_plot')
+
   }
 
   req(!is.null(final_df()))
@@ -80,6 +85,8 @@ observeEvent(input$promethion_app == 'Plot Data',{
     if(input$plot_selected > 0 & !is.null(input$plot_selected)){
 
       shinyjs::show(id="plot_filter_progress")
+      shinyjs::hide(id='plot_selected')
+      shinyjs::hide(id='outliers_plot')
 
       message('Filtering data for plotting')
       shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 20)
@@ -117,6 +124,8 @@ observeEvent(input$promethion_app == 'Plot Data',{
       shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 95)
       Sys.sleep(1)
       shinyjs::hide(id="plot_filter_progress")
+      shinyjs::show(id='plot_selected')
+      shinyjs::show(id='outliers_plot')
     }
 
     plot_df(df)
@@ -128,7 +137,6 @@ observeEvent(input$promethion_app == 'Plot Data',{
 
 plot_gg_ob <- eventReactive(plot_df(),{
   light_colors = c(light = "#FFF68F", dark = "#8DEEEE")
-  print(input$plot_phase_filter)
 
   req(nrow(plot_df())>0)
   message('Building plot')
@@ -156,7 +164,10 @@ plot_gg_ob <- eventReactive(plot_df(),{
 
     message('Starting ggplot')
     #plot
-    ggplot(plot_df())+ theme_minimal() +
+
+    p<-ggplot(plot_df())+ theme_minimal() +
+      labs(x = 'Datetime',
+             y = 'value') +
       # background light/dark
       geom_rect(data = shaded_rect, aes(xmin = start_time,
                                         xmax = end_time,
@@ -170,50 +181,39 @@ plot_gg_ob <- eventReactive(plot_df(),{
       geom_vline(data = phase_changes, aes(xintercept = min_dt),
                  show.legend = FALSE, color = 'black',linetype = 'dashed',alpha=.5 )+
       # text for line breaks
-      geom_text(data = phase_changes, aes(x = min_dt,
-                                          y = text_placement,
-                                          label = phase),
-                # move label forward 1 hour (in seconds), rotate text, set font size, set transparency
-                nudge_x = 3600, angle = 90, size = 4, alpha = .5)+
+      # geom_text(data = phase_changes, aes(x = min_dt,
+      #                                     y = text_placement,
+      #                                     label = phase),
+      #           # move label forward 1 hour (in seconds), rotate text, set font size, set transparency
+      #           nudge_x = 3600, angle = 90, size = 4, alpha = .5)+
       # do points last so they're on top
-      geom_point(aes(date_time, value, color = study_subject_id)) +
+      geom_point(aes(date_time, value, color = study_subject_id,
+                     text = paste0('Date time: ', date_time, '  (',phase,')',
+                     '\n Study Subject ID: ', study_subject_id,
+                      '</br>Metric: ', metric,
+                     '\n Value: ', round(value,4))))
       # grid by each metric
-      facet_grid(~metric, scales = 'free', switch = 'y')
-
+      #facet_grid(~metric, scales = 'free', switch = 'y')
     #shinipsum::random_ggplot(type = 'boxplot')
-    # p <- ggplot(plot_df()) +
-    #   theme_minimal()+
-    #   labs(#title = plot_title,
-    #     y = '',
-    #     x = 'Date time') +
-    # background colors for light phases
-    # geom_rect(data=shaded_rect, aes(xmin = start_time, xmax = end_time, ymin = y_min, ymax = y_max, fill = light_phase),
-    #           alpha = .75, stat = 'identity') +
-    # scale_fill_manual(name = 'Phase', values= light_colors)+
-    # vertical lines indicating change in light phase
-    # geom_vline(data=phase_changes, aes(xintercept = min_dt),
-    #            show.legend = FALSE, color = 'black', linetype = 'dashed', alpha = .5)+
-    # # label for the lines
-    # geom_text(data=phase_changes, aes(x = min_dt, y = max_y, label = phase_num),
-    #           # move label forward 1 hour (in seconds), rotate text, set font size, set transparency
-    #           nudge_x = 3600, angle = 90, size = 4, alpha = .5
-    # ) +
-    # do this last so points are on top
-    # geom_point(aes(date_time, value, color = subject_id))  +
-    # facet_grid(rows = metric, scales = 'free_y', switch = 'y')
+
+    plotly::ggplotly(p, tooltip = 'text')
   } else{
 
     message('No phases to shade')
     message('Starting ggplot')
     #plot
-    ggplot(plot_df())+ theme_minimal() +
-      # do points last so they're on top
-      geom_point(aes(date_time, value, color = study_subject_id)) +
-      # grid by each metric
-      facet_grid(~metric, scales = 'free', switch = 'y')
 
+    p <- ggplot(plot_df())+ theme_minimal() +
+      # do points last so they're on top
+      geom_point(aes(date_time, value, color = study_subject_id)) #+
+      # grid by each metric
+      #facet_grid(~metric, scales = 'free', switch = 'y')
+
+    plotly::ggplotly(p)
   }
 
 }, ignoreInit = TRUE)
 
-output$filtered_prom_plot <- renderPlot(plot_gg_ob())#shinipsum::random_ggplot(type = 'bar'))
+output$filtered_prom_plot <- plotly::renderPlotly(plot_gg_ob())
+  #renderPlot(plot_gg_ob())
+#shinipsum::random_ggplot(type = 'bar'))
