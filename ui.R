@@ -8,23 +8,24 @@
 #
 options(scipen = 999)
 
-if (!require("pacman")) {
-  install.packages("pacman") }
-library(pacman)
-
-pacman::p_load(shiny, tidyverse,here, janitor, shinyjs, readxl, DT, tools,shinyWidgets, update = FALSE)
-pacman::p_unload(here, janitor, readxl, tools,shinyWidgets)
-# library(shiny)
-# library(tidyverse)
-# library(here)
-# library(janitor)
-# library(shinyjs)
-# library(readxl)
-# library(DT)
-# detach(here)
-# detach(janitor)
-# detach(readxl)
-# detach(shinyWidgets)
+# if (!require("pacman")) {
+#   install.packages("pacman") }
+# library(pacman)
+#
+# pacman::p_load(shiny, tidyverse,here, janitor, shinyjs, readxl, DT, tools,shinyWidgets, update = FALSE)
+# pacman::p_unload(here, janitor, readxl, tools,shinyWidgets)
+library(shiny)
+library(tidyverse)
+library(here)
+library(janitor)
+library(shinyjs)
+library(readxl)
+library(DT)
+library(htmltools)
+detach(here)
+detach(janitor)
+detach(readxl)
+detach(shinyWidgets)
 
 time_selection <- format( seq.POSIXt(as.POSIXct('2021-01-01 00:00'),
                                      as.POSIXct('2021-01-01 23:59'), by = "30 min"),"%H:%M")
