@@ -12,8 +12,8 @@ if (!require("pacman")) {
   install.packages("pacman") }
 library(pacman)
 
-pacman::p_load(shiny, tidyverse,here, janitor, shinyjs, readxl, DT, tools,shinyWidgets, update = FALSE)
-pacman::p_unload(here, janitor, readxl, tools,shinyWidgets)
+pacman::p_load(shiny, tidyverse,here, janitor, shinyjs, readxl, DT, tools,shinyWidgets, htmltools, update = FALSE)
+pacman::p_unload(here, janitor, readxl, tools,shinyWidgets, htmltools)
 # library(shiny)
 # library(tidyverse)
 # library(here)
@@ -21,6 +21,7 @@ pacman::p_unload(here, janitor, readxl, tools,shinyWidgets)
 # library(shinyjs)
 # library(readxl)
 # library(DT)
+# library(htmltools)
 # detach(here)
 # detach(janitor)
 # detach(readxl)
