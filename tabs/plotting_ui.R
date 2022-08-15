@@ -55,9 +55,18 @@ tabPanel('Plot Data',
                           tags$hr(style="border-color: black;")
                       ),
                       ####################################################-
-                      actionButton(
-                        inputId = "plot_selected",
-                        label = "Plot selected", width = '100%'),
+#                       actionButton(
+#                         inputId = "plot_selected_as_ts",
+#                         label = "Plot selected over time", width = '100%'),
+# br(),
+#                       actionButton(
+#                         inputId = "plot_selected_as_violin",
+#                         label = "Plot selected distribution", width = '100%'),
+
+radioButtons(inputId = 'plot_type', label = h4('What type of plot?'),
+             choices = list('Over time' = 'plot_ts', 'Boxplot' = 'plot_boxplot')),
+actionButton(inputId='run_plot', label = 'Plot the data.', width = '100%'),
+
                       shinyWidgets::progressBar(id = "plot_filter_progress", value = 0, striped = TRUE),
                       br(),
                       div(id = 'outliers_plot',
