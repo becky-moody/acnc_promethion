@@ -222,7 +222,7 @@ observeEvent(input$run_plot,{
           scale_fill_manual(values = fill_color, guide = 'none') +
           scale_color_manual(values = color_color, guide = 'none')+
           theme_minimal() +
-          labs(x = 'Phases',y='Value ln(x+1)') +
+          labs(x = 'Phases',y=y_axis_name) +
           facet_grid(rows = 'subject_id', scales = 'free_y', switch = 'y')
 
         ## clean up
