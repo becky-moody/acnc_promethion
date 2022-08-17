@@ -20,7 +20,7 @@ tabPanel('Plot Data',
                           tags$hr(style="border-color: black;"),
                           shinyWidgets::pickerInput(inputId = 'plot_animal_filter',
                                                     label = HTML(paste(
-                                                      h4('Which subject(s)?',style = "display: inline;"))),
+                    h4('Which subject(s)?',style = "display: inline;"),p(em('Plot over time might become slow with many subjects.'), style = 'display: inline;'))),
                                                     choices =  character(0),
                                                     selected = character(0),
                                                     options = list(
@@ -52,6 +52,9 @@ tabPanel('Plot Data',
                                                       `live-search`=TRUE),
                                                     multiple = TRUE
                           ),
+                          br(),
+                          actionButton(inputId= 'filter_data_for_plot', label = 'Filter data?',
+                                       width='100%'),
                           tags$hr(style="border-color: black;")
                       ),
                       ####################################################-
@@ -64,7 +67,7 @@ tabPanel('Plot Data',
 #                         label = "Plot selected distribution", width = '100%'),
 
 radioButtons(inputId = 'plot_type', label = h4('What type of plot?'),
-             choices = list('Over time' = 'plot_ts', 'Boxplot' = 'plot_boxplot')),
+             choices = list('Line over time' = 'plot_ts', 'Boxplot (transformation: ln(x+1))' = 'plot_boxplot')),
 actionButton(inputId='run_plot', label = 'Plot the data.', width = '100%'),
 
                       shinyWidgets::progressBar(id = "plot_filter_progress", value = 0, striped = TRUE),
@@ -85,8 +88,17 @@ actionButton(inputId='run_plot', label = 'Plot the data.', width = '100%'),
 
          ####################################################-
          mainPanel(width = 9,
+                   conditionalPanel(
+                     condition = "input.plot_type == 'plot_ts'",
+                     plotly::plotlyOutput('filtered_prom_ts_plot')
+                   ),
+                   conditionalPanel(
+                     condition = "input.plot_type == 'plot_boxplot'",
+                     plotOutput('filtered_prom_boxplot')
+                   )
+
                    #plotOutput('filtered_prom_plot')
-                   plotly::plotlyOutput('filtered_prom_plot')
+                   #plotly::plotlyOutput('filtered_prom_plot')
          )
 
 

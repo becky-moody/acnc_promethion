@@ -12,18 +12,7 @@ library(pacman)
 
 pacman::p_load(shiny, tidyverse,here, janitor, shinyjs, readxl, DT, tools,shinyWidgets, htmltools, plotly, bslib, thematic, update = FALSE)
 pacman::p_unload(here, janitor, readxl, tools, shinyWidgets, htmltools, plotly)
-# library(shiny)
-# library(tidyverse)
-# library(here)
-# library(janitor)
-# library(shinyjs)
-# library(readxl)
-# library(DT)
-# library(htmltools)
-# detach(here)
-# detach(janitor)
-# detach(readxl)
-# detach(shinyWidgets)
+
 
 time_selection <- format( seq.POSIXt(as.POSIXct('2021-01-01 00:00'),
                                      as.POSIXct('2021-01-01 23:59'), by = "30 min"),"%H:%M")
@@ -31,7 +20,7 @@ time_selection <- format( seq.POSIXt(as.POSIXct('2021-01-01 00:00'),
 #rmarkdown::render(here::here("www/example_promethion.Rmd"))
 note_html <- base64enc::dataURI(file = here::here("www/example_promethion.html"), mime = "text/html")
 
-### themes don't work with shinywidgets and are breaking in weird ways, works otherwise
+### themes don't work with shinywidgets and are breaking in weird ways, will probably have to manually change the css -__-
 # my_theme <- bs_theme(bootswatch = "minty", secondary ='#9BCD9B'
 #                      #base_font = font_google("Righteous")
 #                      )

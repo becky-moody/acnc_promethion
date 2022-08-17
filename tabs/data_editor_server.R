@@ -38,8 +38,7 @@ observeEvent(input$auto_file_selection,{
 
 # press aggregate_data_btn to read, clean, join files ----
 observeEvent(input$aggregate_data_btn,{
-  print(input$aggregate_data_btn)
-  message('agg button pressed')
+
   shinyjs::hide(id='aggregate_data_btn')
   shinyjs::show(id='file_progress_bar')
 
