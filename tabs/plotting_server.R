@@ -55,6 +55,13 @@ if(input$promethion_app == 'Plot Data'){
   if('light_dark' %in% final_df_cols){
     shinyjs::show(id='plot_phase_filter')
     final_df_phases <- unique(final_df()$phase)
+
+    #output$light_on_off_note <- renderText(paste0('The light is on from ',input$start_light,' to ', input$end_light,'.'))
+    #shinyjs::show(id='light_on_off_note')
+    ## changing to use html vs text to state when light is on/off
+    light_on_off_note <- paste0('The light is on from ',input$start_light,' to ', input$end_light,'.')
+    shinyjs::html(id='phase_filter_lab',paste('<h4 style = "display: inline;">Which light/dark phase?</h4>','<h6 style = "display: inline;">',light_on_off_note,'</h6>'))
+
     shinyWidgets::updatePickerInput(session,
                                     "plot_phase_filter",
                                     choices = c(final_df_phases),
@@ -67,30 +74,42 @@ if(input$promethion_app == 'Plot Data'){
   c_final_df_cols <- unique(final_df_cols[!str_detect(final_df_cols, paste(calc_cols, collapse = '|'))])
 
   ## update column selections for subject ids
-  shinyWidgets::updatePickerInput(session,
-                                  "which_column_subject_id",
-                                  # label = "download_data_col",
-                                  choices = c(c_final_df_cols),
-                                  selected = character(0))
+  # shinyWidgets::updatePickerInput(session,
+  #                                 "which_column_subject_id",
+  #                                 # label = "download_data_col",
+  #                                 choices = c(c_final_df_cols),
+  #                                 selected = character(0))
 
-  ## show and update subject id selections after choosing col
-  observeEvent(input$which_column_subject_id,{
-    shinyjs::show(id="plot_animal_filter")
-    # create a new column that is subject ids; assuming this column name isn't there
-    final_df(final_df() %>% mutate(study_subject_id = !!rlang::sym(input$which_column_subject_id)))#final_df()[input$which_column_subject_id]))
-    sub_ids <- unique(final_df()$study_subject_id)
-    sub_ids <- na.exclude(sub_ids)
-    shinyWidgets::updatePickerInput(session,
-                                    "plot_animal_filter",
-                                    # label = "download_data_col",
-                                    choices = c(sub_ids),
+  if(input$auto_file_selection == TRUE){ ### if auto upload test file
+    # change label if using test data
+    shinyjs::html(id = 'sub_col_lab',"<h5><s>Which column in data contains subject ids?</s></h5> The correct column for the example data has been selected.")
+    updateSelectInput(session,
+                                    "which_column_subject_id",
+                                    choices = c(c_final_df_cols),
+                                    selected = 'subject_id')
+  } else{
+    updateSelectInput(session,
+                                    "which_column_subject_id",
+                                    choices = c(c_final_df_cols),
                                     selected = character(0))
-  })
+  }
+    ## show and update subject id selections after choosing col
+    observeEvent(input$which_column_subject_id,{
+      shinyjs::show(id="plot_animal_filter")
+      # create a new column that is subject ids; assuming this column name isn't there
+      final_df(final_df() %>% mutate(study_subject_id = !!rlang::sym(input$which_column_subject_id)))#final_df()[input$which_column_subject_id]))
+      sub_ids <- unique(final_df()$study_subject_id)
+      sub_ids <- na.exclude(sub_ids)
+      shinyWidgets::updatePickerInput(session,
+                                      "plot_animal_filter",
+                                      choices = c(sub_ids),
+                                      selected = character(0))
+    }, ignoreInit = TRUE, ignoreNULL= TRUE)
+
 
   metrics <- unique(final_df()$metric)
   shinyWidgets::updatePickerInput(session,
                                   "plot_metric_filter",
-                                  # label = "download_data_col",
                                   choices = c(metrics),
                                   selected = character(0))
 
