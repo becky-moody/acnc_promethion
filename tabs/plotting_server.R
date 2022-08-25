@@ -11,39 +11,20 @@ if(input$promethion_app == 'Plot Data'){
 
     message('Need data uploaded.')
     shinyjs::show(id='no_data_warning')
-
     shinyjs::hide(id='filter_tab_name')
-    #shinyjs::hide(id="which_column_subject_id")
-
     shinyjs::hide(id='all_plot_filters')
-    ## grouped these
-    # shinyjs::hide(id="plot_metric_filter")
-    # shinyjs::hide(id='plot_animal_filter')
-    # shinyjs::hide(id="plot_phase_filter")
-
-    # shinyjs::hide(id="plot_selected_as_ts")
-    # shinyjs::hide(id="plot_selected_as_violin")
     shinyjs::hide(id='run_plot_selections')
     shinyjs::hide(id='run_plot')
-
     shinyjs::hide(id='outliers_plot')
 
   } else{
 
     shinyjs::hide(id='no_data_warning')
-
     shinyjs::show(id='filter_tab_name')
-    #shinyjs::show(id="which_column_subject_id")
     shinyjs::show(id='all_plot_filters')
-
-    # shinyjs::show(id='plot_selected_as_ts')
-    # shinyjs::show(id="plot_selected_as_violin")
     shinyjs::hide(id='run_plot_selections')
     shinyjs::hide(id='run_plot')
-
     shinyjs::hide('outliers_plot')
-
-
 
   req(!is.null(final_df()))
   final_df_cols <- colnames(final_df())
@@ -63,15 +44,12 @@ if(input$promethion_app == 'Plot Data'){
                                   choices = c(metrics),
                                   selected = character(0))
 
-  ## if there are column names (could change this to if final_df is null)
-  #if(!is.null(final_df_cols)){
-
   ## show and update phase filter if the light_dark col has been calculated
   if('light_dark' %in% final_df_cols){
     shinyjs::show(id='plot_phase_filter')
     final_df_phases <- unique(final_df()$phase)
 
-    #output$light_on_off_note <- renderText(paste0('The light is on from ',input$start_light,' to ', input$end_light,'.'))
+    #output$ <- renderText(paste0('The light is on from ',input$start_light,' to ', input$end_light,'.'))
     #shinyjs::show(id='light_on_off_note')
     ## changing to use html vs text to state when light is on/off
     light_on_off_note <- paste0('The light is on from ',input$start_light,' to ', input$end_light,'.')
@@ -84,15 +62,6 @@ if(input$promethion_app == 'Plot Data'){
                                     selected = c(final_df_phases))
   }
 
-  # calc_cols <- c('metric','value','log_value','diff','diff_log','aggregated_interval','phase_num','light_dark','total_phase_num','light_on','phase')
-  #
-  #
-  # c_final_df_cols <- unique(final_df_cols[!str_detect(final_df_cols, paste(calc_cols, collapse = '|'))])
-
-
-
-
-
   observeEvent(input$filter_data_for_plot,{
     plot_df(NULL)  # reset data
     output$filtered_prom_ts_plot <<- NULL
@@ -101,8 +70,6 @@ if(input$promethion_app == 'Plot Data'){
 
       shinyjs::hide(id='run_plot')
       shinyjs::show(id="plot_filter_progress")
-      # shinyjs::hide(id='plot_selected_as_ts')
-      # shinyjs::hide(id='plot_selected_as_violin')
       shinyjs::hide(id='outliers_plot')
       shinyjs::hide(id='run_plot_selections')
       shinyjs::hide(id='run_plot')
@@ -382,6 +349,8 @@ observeEvent(input$run_plot,{
 
 }, ignoreInit = TRUE) # end observeEvent run_plot
 #
+
+
 
 # observeEvent(input$calculate_outliers,{
 #   cumulative_metrics <- c('foodupa','waterupa','pedmeters','allmeters')
