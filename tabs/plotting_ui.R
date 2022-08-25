@@ -15,17 +15,7 @@ tabPanel('Plot Data',
                       #                  `live-search`=TRUE),
                       #   multiple = FALSE
                       # ),
-                      selectInput(
-                        inputId = 'which_column_subject_id',
-                        label = h4('Which column in data contains subject ids?',id='sub_col_lab'),
-                        choices =  character(0),
-                        selected = character(0),
-                        # selectize = TRUE,
-                        # options = list(`actions-box` = TRUE,
-                        #                #`live-search`=TRUE
-                        #                ),
-                        multiple = FALSE
-                      ),
+
                       ####################################################-
                       div(id = 'all_plot_filters',
                           tags$hr(style="border-color: black;"),
@@ -43,8 +33,7 @@ tabPanel('Plot Data',
                           ## this update dropdown is in data_editor_server.R
                           shinyWidgets::pickerInput(inputId = 'plot_metric_filter',
                                                     label = HTML(paste(
-                                                      h4('Which metric?',style = "display: inline;"),
-                                                      h6(em("'_diff' metrics are the change between time."),style = "display: inline;"))),
+                                                      h4('Which metric?',style = "display: inline;"))),
                                                     choices =  character(0),
                                                     selected = character(0),
                                                     options = list(
@@ -52,6 +41,8 @@ tabPanel('Plot Data',
                                                       `live-search`=TRUE),
                                                     multiple = FALSE
                           ),
+                    checkboxInput('plot_diff_metrics','Do you want the differences of this metric?', value = FALSE),
+                    br(),
                           shinyWidgets::pickerInput(inputId = 'plot_phase_filter',
                                                     label = HTML(paste(
                                                       h4('Which light/dark phase?', id = 'phase_filter_lab'))),
@@ -69,9 +60,11 @@ tabPanel('Plot Data',
                           tags$hr(style="border-color: black;")
                       ),
                       ####################################################-
-
+div(id = 'run_plot_selections',
 radioButtons(inputId = 'plot_type', label = h4('What type of plot?'),
              choices = list('Line over time' = 'plot_ts', 'Boxplot (transformation: ln(x+1))' = 'plot_boxplot')),
+checkboxInput('plot_log_transformation','Plot the ln(value + 1) transformation?', value = FALSE),
+),
 actionButton(inputId='run_plot', label = 'Plot the data.', width = '100%'),
 
                       shinyWidgets::progressBar(id = "plot_filter_progress", value = 0, striped = TRUE),

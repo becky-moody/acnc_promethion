@@ -13,7 +13,7 @@ if(input$promethion_app == 'Plot Data'){
     shinyjs::show(id='no_data_warning')
 
     shinyjs::hide(id='filter_tab_name')
-    shinyjs::hide(id="which_column_subject_id")
+    #shinyjs::hide(id="which_column_subject_id")
 
     shinyjs::hide(id='all_plot_filters')
     ## grouped these
@@ -23,7 +23,7 @@ if(input$promethion_app == 'Plot Data'){
 
     # shinyjs::hide(id="plot_selected_as_ts")
     # shinyjs::hide(id="plot_selected_as_violin")
-    shinyjs::hide(id='plot_type')
+    shinyjs::hide(id='run_plot_selections')
     shinyjs::hide(id='run_plot')
 
     shinyjs::hide(id='outliers_plot')
@@ -33,12 +33,12 @@ if(input$promethion_app == 'Plot Data'){
     shinyjs::hide(id='no_data_warning')
 
     shinyjs::show(id='filter_tab_name')
-    shinyjs::show(id="which_column_subject_id")
+    #shinyjs::show(id="which_column_subject_id")
     shinyjs::show(id='all_plot_filters')
 
     # shinyjs::show(id='plot_selected_as_ts')
     # shinyjs::show(id="plot_selected_as_violin")
-    shinyjs::hide(id='plot_type')
+    shinyjs::hide(id='run_plot_selections')
     shinyjs::hide(id='run_plot')
 
     shinyjs::hide('outliers_plot')
@@ -47,6 +47,21 @@ if(input$promethion_app == 'Plot Data'){
 
   req(!is.null(final_df()))
   final_df_cols <- colnames(final_df())
+
+  ## update subject id selections after choosing col
+  sub_ids <- unique(final_df()$analysis_subject_id)
+  sub_ids <- na.exclude(sub_ids)
+  shinyWidgets::updatePickerInput(session,
+                                  "plot_animal_filter",
+                                  choices = c(sub_ids),
+                                  selected = character(0))
+
+
+  metrics <- unique(final_df()$metric)
+  shinyWidgets::updatePickerInput(session,
+                                  "plot_metric_filter",
+                                  choices = c(metrics),
+                                  selected = character(0))
 
   ## if there are column names (could change this to if final_df is null)
   #if(!is.null(final_df_cols)){
@@ -60,6 +75,7 @@ if(input$promethion_app == 'Plot Data'){
     #shinyjs::show(id='light_on_off_note')
     ## changing to use html vs text to state when light is on/off
     light_on_off_note <- paste0('The light is on from ',input$start_light,' to ', input$end_light,'.')
+
     shinyjs::html(id='phase_filter_lab',paste('<h4 style = "display: inline;">Which light/dark phase?</h4>','<h6 style = "display: inline;">',light_on_off_note,'</h6>'))
 
     shinyWidgets::updatePickerInput(session,
@@ -68,44 +84,13 @@ if(input$promethion_app == 'Plot Data'){
                                     selected = c(final_df_phases))
   }
 
-  calc_cols <- c('metric','value','aggregated_interval','phase_num','light_dark','total_phase_num','light_on','phase')
+  # calc_cols <- c('metric','value','log_value','diff','diff_log','aggregated_interval','phase_num','light_dark','total_phase_num','light_on','phase')
+  #
+  #
+  # c_final_df_cols <- unique(final_df_cols[!str_detect(final_df_cols, paste(calc_cols, collapse = '|'))])
 
 
-  c_final_df_cols <- unique(final_df_cols[!str_detect(final_df_cols, paste(calc_cols, collapse = '|'))])
 
-
-  if(input$auto_file_selection == TRUE){ ### if auto upload test file
-    # change label if using test data
-    shinyjs::html(id = 'sub_col_lab',"<h5><s>Which column in data contains subject ids?</s></h5> The correct column for the example data has been selected.")
-    updateSelectInput(session,
-                                    "which_column_subject_id",
-                                    choices = c(c_final_df_cols),
-                                    selected = 'subject_id')
-  } else{
-    updateSelectInput(session,
-                                    "which_column_subject_id",
-                                    choices = c(c_final_df_cols),
-                                    selected = character(0))
-  }
-    ## show and update subject id selections after choosing col
-    observeEvent(input$which_column_subject_id,{
-      shinyjs::show(id="plot_animal_filter")
-      # create a new column that is subject ids; assuming this column name isn't there
-      final_df(final_df() %>% mutate(study_subject_id = !!rlang::sym(input$which_column_subject_id)))#final_df()[input$which_column_subject_id]))
-      sub_ids <- unique(final_df()$study_subject_id)
-      sub_ids <- na.exclude(sub_ids)
-      shinyWidgets::updatePickerInput(session,
-                                      "plot_animal_filter",
-                                      choices = c(sub_ids),
-                                      selected = character(0))
-    }, ignoreInit = TRUE, ignoreNULL= TRUE)
-
-
-  metrics <- unique(final_df()$metric)
-  shinyWidgets::updatePickerInput(session,
-                                  "plot_metric_filter",
-                                  choices = c(metrics),
-                                  selected = character(0))
 
 
   observeEvent(input$filter_data_for_plot,{
@@ -119,29 +104,29 @@ if(input$promethion_app == 'Plot Data'){
       # shinyjs::hide(id='plot_selected_as_ts')
       # shinyjs::hide(id='plot_selected_as_violin')
       shinyjs::hide(id='outliers_plot')
-      shinyjs::hide(id='plot_type')
+      shinyjs::hide(id='run_plot_selections')
       shinyjs::hide(id='run_plot')
 
       message('Filtering data for plotting')
       shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 20)
-      df <- final_df() %>% mutate(date_time = as.POSIXct(date_time),
-                                  log_value = log1p(value,na.rm=TRUE))
+      df <- final_df() %>% mutate(date_time = as.POSIXct(date_time))
       shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 40)
       Sys.sleep(1)
       # only apply filters if these have values
       if(!is.null(input$plot_animal_filter)){
 
         message('Subjects: ', input$plot_animal_filter) # this doesn't have spaces but it's for me anyway
-        df <- df %>% filter(study_subject_id %in% input$plot_animal_filter)
-        #!!rlang::sym(input$which_column_subject_id) %in% input$plot_animal_filter)
-      } else { # or just select cages, could be a lot if there are multiple runs
-        df <- df %>% filter(cage_num %in% c(1,2))
+        df <- df %>% filter(analysis_subject_id %in% input$plot_animal_filter)
+      } else { # or just select a couple cages, could be a lot if there are multiple runs
+        df <- df %>% filter(cage_num == sample(cage_num, 2))
       }
 
       shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 60)
 
       if(!is.null(input$plot_metric_filter)){
-        message('Metrics: ', input$plot_metric_filter)
+        show_message <- paste('Metrics: ', ifelse(input$plot_diff_metrics == TRUE, 'difference of',''), input$plot_metric_filter)
+        message(show_message)
+        rm(show_message)
 
         df <- df %>% filter(metric %in% input$plot_metric_filter)
       } else{ # or just select one random metric
@@ -161,7 +146,7 @@ if(input$promethion_app == 'Plot Data'){
       # shinyjs::show(id='plot_selected_as_ts')
       # shinyjs::show(id='plot_selected_as_violin')
       #shinyjs::show(id='outliers_plot') # not ready yet
-      shinyjs::show(id='plot_type')
+      shinyjs::show(id='run_plot_selections')
       shinyjs::show(id='run_plot')
 
     plot_df(df)
@@ -173,7 +158,7 @@ if(input$promethion_app == 'Plot Data'){
 
 observeEvent(input$run_plot,{
   req(nrow(plot_df())>0)
-
+  shinyjs::hide(id='run_plot')
   shinyjs::show(id='plot_filter_progress')
   shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 20)
 
@@ -190,132 +175,137 @@ observeEvent(input$run_plot,{
   plot_check_n_phases <- (length(input$plot_phase_filter) > 1) # if more than one convert to difference for cumulative values
   plot_check_is_cumulative_metric <- unique(plot_df()$metric) %in% cumulative_metrics # TRUE = is cumulative; FALSE = not cumulative; this matters for boxplots, cumulative will get changed to diff
 
+  shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 30)
+  # Format data for plotting ----
+  ## want boxplot ----
+  if(input$plot_type == 'plot_boxplot'){
+    ### of a cumulative metric (forcing difference) ----
+    if(plot_check_is_cumulative_metric == TRUE){
+      if(input$plot_log_transformation == TRUE){
+        #### log transformed user chose: diff_log ----
+        use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff_log)
+        y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences of ln(value + 1) transformation')
+        build_caption <- "Forced conversion to 1 lag difference of ln(value + 1) transformed values of this cumulative metric. Raw cumulative values can be viewed as 'Line over time'."
+      } else{
+        ### not log transformed forcing difference: diff ----
+        use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff)
+        y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences')
+        build_caption <- "Forced conversion to 1 lag difference of this cumulative metric. Raw cumulative values can be viewed as 'Line over time'."
+      }
+
+    } else{
+      ## of a non cumulative metric with user choosing----
+      if(input$plot_log_transformation == TRUE & input$plot_diff_metrics == TRUE){
+        #### log transformed difference : diff_log ----
+      use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff_log)
+      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences of ln(value + 1) transformation')
+      build_caption <- 'User chose 1 lag differences of ln(value + 1) transformed values.'
+      } else if(input$plot_log_transformation == FALSE & input$plot_diff_metrics == TRUE){
+        #### difference : diff ----
+        use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff)
+        y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences')
+        build_caption <- 'User chose 1 lag differences of values.'
+      } else if(input$plot_log_transformation == TRUE & input$plot_diff_metrics == FALSE){
+        #### log transformed  log_value ----
+        use_this_df_for_plot <- plot_df() %>% mutate(plot_value = log_value)
+        y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' ln(value + 1) transformation')
+        build_caption <- 'User chose ln(value + 1) transformed values.'
+      } else{
+        #### raw values ----
+        use_this_df_for_plot <- plot_df() %>% mutate(plot_value = value)
+        y_axis_name <- paste0(unique(use_this_df_for_plot$metric))
+        build_caption <- NA
+      }
+    }
+  } else if(input$plot_type == 'plot_ts'){
+    ### want ts plot cumulative doesn't matter ----
+    if(input$plot_log_transformation == TRUE & input$plot_diff_metrics == TRUE){
+      #### log transformed difference : diff_log ----
+      use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff_log)
+      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' difference of ln(value + 1) transformation')
+      build_caption <- 'User chose 1 lag differences of ln(value + 1) transformed values.'
+    } else if(input$plot_log_transformation == FALSE & input$plot_diff_metrics == TRUE){
+      #### difference : diff ----
+      use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff)
+      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences')
+      build_caption <- 'User chose 1 lag differences of values.'
+    } else if(input$plot_log_transformation == TRUE & input$plot_diff_metrics == FALSE){
+      #### log transformed  log_value ----
+      use_this_df_for_plot <- plot_df() %>% mutate(plot_value = log_value)
+      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' ln(value + 1) transformation')
+      build_caption <- 'User chose ln(value + 1) transformed values.'
+    } else{
+      #### raw values ----
+      use_this_df_for_plot <- plot_df() %>% mutate(plot_value = value)
+      y_axis_name <- paste0(unique(use_this_df_for_plot$metric))
+      build_caption <- NA
+    }
+  } else{ # end plot type
+    ## else raw values ----
+    use_this_df_for_plot <- plot_df() %>% mutate(plot_value = value)
+    y_axis_name <- paste0(unique(use_this_df_for_plot$metric))
+    build_caption <- NA
+  }
 
   if(input$plot_type == 'plot_boxplot'){
+    plot_check_has_phases <- 'light_dark' %in% colnames(use_this_df_for_plot)
     if(plot_check_has_phases == TRUE ){
       ###################################################################-
       ## Boxplots that include phases ----
       message('Starting plot')
       shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 50)
-      plot_df(plot_df() %>% mutate(phase = fct_reorder(phase, total_phase_num)))
-      ###################################################################-
-      if(plot_check_is_cumulative_metric == TRUE){
-        message('Starting boxplot of cumulative metric with phases')
-        message('Converting to 1 lag difference')
-        diff_plot_df <- plot_df() %>% ungroup() %>%
-          group_by(metric, phase, study_subject_id) %>%
-          arrange(date_time) %>%
-          mutate(log_value_diff = log_value - lag(log_value))
+      use_this_df_for_plot <- use_this_df_for_plot %>% mutate(phase = fct_reorder(phase, total_phase_num))
 
-        message('Building plot')
-        y_axis_name <- paste(unique(plot_df()$metric),'difference ( ln(x+1) )')
-        p <-ggplot(diff_plot_df, aes(x=phase, y = log_value_diff, group = phase, fill = light_dark, color = light_dark)) +
-          gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
-          gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
-                                     scale = 3)+
-          scale_fill_manual(values = fill_color, guide = 'none') +
-          scale_color_manual(values = color_color, guide = 'none')+
-          theme_minimal() +
-          labs(x = 'Phases', y=y_axis_name, caption = "Converted to 1 lag difference of the ln(x+1) transformed values, raw cumulative metrics need to be viewed as 'Line over time'.") +
-          facet_grid(rows = 'study_subject_id' ,scales = 'free_y') +
-          theme(panel.spacing = unit(.05, "lines"),
-                panel.border = element_rect(color = "black", fill = NA, size = .5),
-                strip.background = element_rect(color = "black", size = .5))
-        ## clean up
-        rm(diff_plot_df, y_axis_name)
-        message('Finished with boxplot of cumulative metric with phases')
-        # end cumulative metric boxplots
+      message('Building plot')
+      p <-ggplot(use_this_df_for_plot, aes(x=phase, y = plot_value,
+                                           group = phase, fill = light_dark, color = light_dark)) +
+        gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
+        gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
+                                   scale = 3)+
+        scale_fill_manual(values = fill_color, guide = 'none') +
+        scale_color_manual(values = color_color, guide = 'none')+
+        theme_minimal() +
+        labs(x = 'Phases', y=y_axis_name, caption = build_caption) +
+        facet_grid(rows = 'analysis_subject_id' ,scales = 'free_y') +
+        theme(panel.spacing = unit(.05, "lines"),
+              panel.border = element_rect(color = "black", fill = NA, size = .5),
+              strip.background = element_rect(color = "black", size = .5))
+      message('Finished with boxplot of metric with phases')
 
-      } else{
-        message('Building boxplot of non-cumulative metric with phases')
-        y_axis_name <- paste(unique(plot_df()$metric),'( ln(x+1) )')
-        p <-ggplot(plot_df(), aes(x=phase, y = log1p(value), group = phase, fill = light_dark, color = light_dark)) +
-          gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
-          gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
-                                     scale = 3)+
-          scale_fill_manual(values = fill_color, guide = 'none') +
-          scale_color_manual(values = color_color, guide = 'none')+
-          theme_minimal() +
-          labs(x = 'Phases',y=y_axis_name) +
-          facet_grid(rows = 'study_subject_id', scales = 'free_y', switch = 'y')
-
-        ## clean up
-        rm(y_axis_name)
-        message('Finished with boxplot of metric with phases')
-      } # end if else cumulative metric
-
-
-      message('Finished with plot \n')
     } else if(plot_check_has_phases == FALSE){
-      ###################################################################-
-      ## Boxplots that DO NOT include phases ----
-      message('Boxplot of cumulative metric that DO NOT include phases')
-      if(plot_check_is_cumulative_metric == TRUE){
-        message('Starting boxplot of cumulative metric WITHOUT phases')
-        message('Converting to 1 lag difference')
-        diff_plot_df <- plot_df() %>% ungroup() %>%
-          group_by(metric, study_subject_id) %>%
-          arrange(date_time) %>%
-          mutate(log_value_diff = log_value - lag(log_value))
+      shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 50)
+      message('Building plot')
 
-        message('Building plot')
-        y_axis_name <- paste(unique(plot_df()$metric),'difference ( ln(x+1) )')
-        p <-ggplot(diff_plot_df, aes(x=0,y = log_value_diff,color = study_subject_id)) +
-          gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
-          gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
-                                     scale = 3)+
-          theme_minimal() +
-          labs(y=y_axis_name, caption = "Converted to 1 lag difference of ln(x+1) transformed values, raw cumulative metrics need to be viewed as 'Line over time'.") +
-          facet_grid(rows = 'study_subject_id' ,scales = 'free_y') +
-          theme(panel.spacing = unit(.05, "lines"),
-                panel.border = element_rect(color = "black", fill = NA, size = .5),
-                strip.background = element_rect(color = "black", size = .5))
-        ## clean up
-        rm(diff_plot_df, y_axis_name)
-        message('Finished with boxplot of cumulative metric WITHOUT phases')
-        # end cumulative metric boxplots
+      p <-ggplot(use_this_df_for_plot, aes(x=0,y = plot_value, color = analysis_subject_id)) +
+        gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
+        gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
+                                   scale = 3)+
+        theme_minimal() +
+        labs(x = '', y=y_axis_name, caption = build_caption) +
+        facet_grid(rows = 'analysis_subject_id' ,scales = 'free_y') +
+        theme(panel.spacing = unit(.05, "lines"),
+              panel.border = element_rect(color = "black", fill = NA, size = .5),
+              strip.background = element_rect(color = "black", size = .5))
 
-      } else{
-        message('Building boxplot of non-cumulative metric WITHOUT phases')
-        y_axis_name <- paste(unique(plot_df()$metric),'( ln(x+1) )')
-        p <- ggplot(plot_df(), aes(x=0,y = log1p(value),color = study_subject_id)) +
-          gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
-          gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
-                                     scale = 3)+
-          theme_minimal() +
-          labs(y='Value ln(x+1)') +
-          facet_grid(rows = 'study_subject_id', scales = 'free_y', switch = 'y')
-
-        ## clean up
-        rm(y_axis_name)
-        message('Finished with boxplot of non-cumulative metric WITHOUT phases')
-      } # end if else cumulative metric
-      message('Finished with plot \n')
+      message('Finished with boxplot of metric without phases')
     } else{
-      message('No plot \n')
       p <- NULL
     }
     plot_p <- p
-
     shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 80)
     output$filtered_prom_boxplot <- renderPlot(plot_p)
 
+    ################################################################################
   } else if(input$plot_type == 'plot_ts'){
-    ###################################################################-
-    message('Starting plot')
-    shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 50)
-    ###################################################################-
-    if(plot_check_has_phases == TRUE){
-      ###################################################################-
-      # TS plot that include phases ----
-      message('TS plot that include phases')
-      plot_df(plot_df() %>% mutate(phase = fct_reorder(phase, total_phase_num)))
+    plot_check_has_phases <- 'light_dark' %in% colnames(use_this_df_for_plot)
+    if(plot_check_has_phases == TRUE ){
+      shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 50)
 
       message('Getting line breaks for phases')
       ### line breaks for light/dark switches (geom_vline)----
-      phase_changes <- plot_df() %>% group_by(metric) %>%
-        mutate(max_value = max(value),
-               min_value = min(value)) %>% ungroup() %>%
+      phase_changes <- use_this_df_for_plot %>% group_by(metric) %>%
+        mutate(max_value = max(plot_value),
+               min_value = min(plot_value)) %>% ungroup() %>%
         mutate(value_range = max_value - min_value,
                # adjust text so it doesn't hang off, not sure if this will work for every one
                text_placement = value_range * (2/3)+min_value) %>%
@@ -324,24 +314,25 @@ observeEvent(input$run_plot,{
 
       message('Getting background for phases')
       ## background for light/dark (geom_rect) ----
-      shaded_rect <- plot_df() %>% group_by(metric) %>%
-        mutate(y_max = max(value)) %>%
-        group_by( metric, light_dark, phase_num, y_max) %>%
-        summarise(start_time = min(date_time), end_time = max(date_time),
-                  y_min = min(value)) %>%
-        ungroup() %>% group_by(metric) %>%
-        mutate(y_min = ifelse(any(y_min==0),0,y_min))
+      shaded_rect <- use_this_df_for_plot %>% ungroup() %>%
+        group_by(metric) %>%
+        mutate(y_max = max(plot_value, na.rm = TRUE),
+               y_min = min(plot_value, na.rm= TRUE),
+               y_min = ifelse(y_min == 0, 0, y_min)) %>%
+        group_by(metric, light_dark, phase_num, y_max, y_min) %>%
+        summarise(start_time = min(date_time, na.rm = TRUE),
+                  end_time = max(date_time, na.rm = TRUE)) %>%
+        ungroup()
 
       message('Building plot')
       ## ggplot ts plot that include phases ----
-      y_axis_name <- paste(unique(plot_df()$metric))
 
       ## label notes: scales::label_wrap() stringr::str_wrap() for wrapping
 
-      p <- ggplot(plot_df())+
+      p <- ggplot(use_this_df_for_plot)+
         theme_minimal() +
         # set axis names
-        labs(x = 'Date Time', y = y_axis_name) +
+        labs(x = 'Date Time', y = y_axis_name, caption = build_caption) +
         # build background light/dark
         geom_rect(data = shaded_rect, aes(xmin = start_time,
                                           xmax = end_time,
@@ -354,40 +345,29 @@ observeEvent(input$run_plot,{
         # add lines for breaks
         geom_vline(data = phase_changes, aes(xintercept = as.numeric(min_dt)),
                    show.legend = FALSE, color = 'black',linetype = 'dashed',alpha=.5 )+
-        geom_line(aes(x=date_time, y=value, color = study_subject_id, group = study_subject_id)) +
+        geom_line(aes(x=date_time, y=plot_value, color = analysis_subject_id, group = analysis_subject_id)) +
         # points last so they're on top
-        geom_point(aes(x=date_time, y=value, color = study_subject_id, group = study_subject_id,
-                      ## this will be hover tooltip in plotly
-                      text = paste0('Date time: ', date_time, '  (',phase,')',
-                                    '\nStudy Subject ID: ', study_subject_id,
-                                    '</br>Metric: ', metric,
-                                    '\nValue: ', round(value,4))))
-      message('Making into plotly')
+        geom_point(aes(x=date_time, y=plot_value, color = analysis_subject_id, group = analysis_subject_id,
+                       ## this will be hover tooltip in plotly
+                       text = paste0('Date time: ', date_time, '  (',phase,')',
+                                     '\nStudy Subject ID: ', analysis_subject_id,
+                                     '</br>Metric: ', metric,
+                                     '\nValue: ', round(plot_value,4))))
 
       rm(y_axis_name, shaded_rect, phase_changes) ## clean up
       message('Finished with plot \n')
-
     } else if(plot_check_has_phases == FALSE){
-      ###################################################################-
-      ## TS that DO NOT include phases ----
-      message('TS plot without phases')
-      message('Building plot')
-      y_axis_name <- paste(unique(plot_df()$metric))
-      p <- ggplot(plot_df())+ theme_minimal() +
-        geom_line(aes(x=date_time, y=value, color = study_subject_id, group = study_subject_id)) +
-        geom_point(aes(x=date_time, y=value, color = study_subject_id,group = study_subject_id,
-                      text = paste0('Date time: ', date_time,
-                                    '\nStudy Subject ID: ', study_subject_id,
-                                    '</br>Metric: ', metric,
-                                    '\nValue: ', round(value,4)))) +
-        labs(x = 'Date Time', y = y_axis_name) +
-      message('Making into plotly')
 
-      message('Finished with plot \n')
-    } else{
-      ###################################################################-
-      ## Anything else ----
-      message('No plot \n')
+      p <- ggplot(use_this_df_for_plot)+ theme_minimal() +
+        geom_line(aes(x=date_time, y=plot_value, color = analysis_subject_id, group = analysis_subject_id)) +
+        geom_point(aes(x=date_time, y=plot_value, color = analysis_subject_id,group = analysis_subject_id,
+                       text = paste0('Date time: ', date_time,
+                                     '\nStudy Subject ID: ', analysis_subject_id,
+                                     '</br>Metric: ', metric,
+                                     '\nValue: ', round(plot_value,4)))) +
+        labs(x = 'Date Time', y = y_axis_name, caption = build_caption)
+
+    }else{
       p <- NULL
     }
     plotly_p <- plotly::ggplotly(p, tooltip = c('text'))
@@ -395,75 +375,76 @@ observeEvent(input$run_plot,{
     shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 80)
     output$filtered_prom_ts_plot <- plotly::renderPlotly(plotly_p)
 
-  } # end else if plot_type == 'plot_ts'
+  }
   Sys.sleep(.1)
   shinyjs::hide(id='plot_filter_progress')
+  shinyjs::show(id='run_plot')
 
 }, ignoreInit = TRUE) # end observeEvent run_plot
 #
 
-observeEvent(input$calculate_outliers,{
-  cumulative_metrics <- c('foodupa','waterupa','pedmeters','allmeters')
-  req(nrow(plot_df())>0)
-  no_outlier_df(NULL)
-
-  df <- plot_df()
-  c_df <- df
-
-  ## outliers calculated using log(x+1) values; if cumulative using diff(log1p(value)) values
-  if(df$metric %in% cumulative_metrics){
-    df <- df %>% ungroup() %>%
-      group_by(metric, study_subject_id) %>%
-      arrange(date_time) %>%
-      mutate(calc_value = log_value - lag(log_value)) %>% ungroup()
-  }else{
-    df <- df %>% mutate(calc_value = log_value)
-  }
-
-
-  if(input$calc_outliers == 'remove_outliers'){
-    # phases included?
-    if('light_dark' %in% colnames(df)){
-      iqr_df <- df %>% group_by(metric, study_subject_id, phase_num) %>%
-        mutate(iqr = IQR(calc_value, na.rm = TRUE),
-               upper = quantile(calc_value, .75),
-               lower = quantile(calc_value, .25) ) %>%
-        ungroup() %>%
-        mutate(upper = upper  + 1.5 * IQR,
-               lower = lower  - 1.5 * IQR,
-          is_outlier = ifelse((calc_value > upper) | (calc_value < lower), 1, 0))
-    }else{
-      iqr_df <- df %>% group_by(metric, study_subject_id) %>%
-        mutate(iqr = IQR(calc_value))%>%
-        ungroup() %>%
-        mutate(upper = upper  + 1.5 * IQR,
-               lower = lower  - 1.5 * IQR,
-               is_outlier = ifelse((calc_value > upper) | (calc_value < lower), 1, 0))
-    }
-    c_df <- iqr_df %>% filter(is_outlier == 0) %>%
-      mutate(outlier_method = 'iqr') %>%
-      select(-upper,-lower,-iqr,-is_outlier)
-
-  } else if(input$calc_outliers == 'impute_outliers'){
-    ## do this later
-
-  }else if(input$calc_outliers == 'ts_outliers'){
-    #tsoutliers tsclean
-    ts_df <- ex_data %>% filter(metric == 'kcalhr', subject_id == 'animal1') %>%
-      mutate(study_subject_id = subject_id,
-             date_time = as.POSIXct(date_time) ) %>%
-
-
-    # %>% tsibble::as_tsibble(., index = date_time,
-    #                       key = c(metric, study_subject_id),
-    #                       regular = TRUE)
-
-
-    ex_data <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-10.csv'))
-  }
-  no_outlier_df(c_df)
-
-}, ignoreInit = TRUE)
+# observeEvent(input$calculate_outliers,{
+#   cumulative_metrics <- c('foodupa','waterupa','pedmeters','allmeters')
+#   req(nrow(plot_df())>0)
+#   no_outlier_df(NULL)
+#
+#   df <- plot_df()
+#   c_df <- df
+#
+#   ## outliers calculated using log(x+1) values; if cumulative using diff(log1p(value)) values
+#   if(df$metric %in% cumulative_metrics){
+#     df <- df %>% ungroup() %>%
+#       group_by(metric, analysis_subject_id) %>%
+#       arrange(date_time) %>%
+#       mutate(calc_value = log_value - lag(log_value)) %>% ungroup()
+#   }else{
+#     df <- df %>% mutate(calc_value = log_value)
+#   }
+#
+#
+#   if(input$calc_outliers == 'remove_outliers'){
+#     # phases included?
+#     if('light_dark' %in% colnames(df)){
+#       iqr_df <- df %>% group_by(metric, analysis_subject_id, phase_num) %>%
+#         mutate(iqr = IQR(calc_value, na.rm = TRUE),
+#                upper = quantile(calc_value, .75),
+#                lower = quantile(calc_value, .25) ) %>%
+#         ungroup() %>%
+#         mutate(upper = upper  + 1.5 * IQR,
+#                lower = lower  - 1.5 * IQR,
+#           is_outlier = ifelse((calc_value > upper) | (calc_value < lower), 1, 0))
+#     }else{
+#       iqr_df <- df %>% group_by(metric, analysis_subject_id) %>%
+#         mutate(iqr = IQR(calc_value))%>%
+#         ungroup() %>%
+#         mutate(upper = upper  + 1.5 * IQR,
+#                lower = lower  - 1.5 * IQR,
+#                is_outlier = ifelse((calc_value > upper) | (calc_value < lower), 1, 0))
+#     }
+#     c_df <- iqr_df %>% filter(is_outlier == 0) %>%
+#       mutate(outlier_method = 'iqr') %>%
+#       select(-upper,-lower,-iqr,-is_outlier)
+#
+#   } else if(input$calc_outliers == 'impute_outliers'){
+#     ## do this later
+#
+#   }else if(input$calc_outliers == 'ts_outliers'){
+#     #tsoutliers tsclean
+#     ts_df <- ex_data %>% filter(metric == 'kcalhr', subject_id == 'animal1') %>%
+#       mutate(analysis_subject_id = subject_id,
+#              date_time = as.POSIXct(date_time) ) %>%
+#
+#
+#     # %>% tsibble::as_tsibble(., index = date_time,
+#     #                       key = c(metric, analysis_subject_id),
+#     #                       regular = TRUE)
+#
+#
+#     #ex_data <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-10.csv'))
+#   }
+#   #no_outlier_df(c_df)
+#
+# }, ignoreInit = TRUE)
 
 
 

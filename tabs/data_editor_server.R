@@ -1,6 +1,8 @@
 if(input$promethion_app == 'Data Editor'){
 
+
 if(is.null(final_df())){
+
       shinyjs::hide(id='auto_file_notes')
       shinyjs::hide(id='file_progress_bar')
 
@@ -19,10 +21,6 @@ if(is.null(final_df())){
     }
 
 
-
-
-
-
 observeEvent(input$auto_file_selection,{
   if(input$auto_file_selection == TRUE){
     shinyjs::hide(id='prom_file')
@@ -33,8 +31,43 @@ observeEvent(input$auto_file_selection,{
     shinyjs::show(id='meta_file')
     shinyjs::hide(id='auto_file_notes')
   }
-
 })
+
+## have user select subject_id column
+
+observeEvent(input$meta_file,{
+  req(input$meta_file)
+
+  ext <- tools::file_ext(input$meta_file$name)
+  meta_dat <- switch(ext,
+                     csv = read.csv(input$meta_file$datapath),
+                     xls = readxl::read_xls(input$meta_file$datapath),
+                     xlsx = readxl::read_xlsx(input$meta_file$datapath),
+                     validate('Please select a .csv, .xls, or .xlsx file.'))
+
+  #fix column names; I don't care what is in this
+  # NEED: run and cage_num
+  meta_df <- meta_dat #%>%janitor::clean_names()
+  meta_colnames <- colnames(meta_df)
+
+  updateSelectInput(session,
+                    "which_column_subject_id1",
+                    choices = c(meta_colnames),
+                    selected = character(0))
+
+  #shinyjs::show(id="which_column_subject_id1")
+
+}, ignoreNULL = TRUE)
+
+observeEvent(input$auto_file_selection == TRUE,{
+  shinyjs::html(id = 'sub_col_lab1', '<s>Which column in meta data contains subject ids?</s> This column has already been selected for the example data.')
+  updateSelectInput(session,
+                    "which_column_subject_id1",
+                    choices = 'subject_id',
+                    selected = 'subject_id')
+  updateSelectInput(session, 'aggregate_data', label = 'Change the example data aggregation?')
+  shinyjs::html(id = 'start_light_lab', 'Change Light/Dark Phases? <small>The example data is set from 7:00 to 19:00.</small>')
+}, ignoreNULL = TRUE, ignoreInit = TRUE)
 
 # press aggregate_data_btn to read, clean, join files ----
 observeEvent(input$aggregate_data_btn,{
@@ -61,7 +94,7 @@ observeEvent(input$aggregate_data_btn,{
     # shinyjs::hide(id='meta_file')
     # shinyjs::show(id='auto_file_notes')
     shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 10)
-    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-10.csv'))
+    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-25.csv'))
 
     if(input$aggregate_data == '5 minutes'){
       message('Using test data by 5 mins, no need to run.')
@@ -72,7 +105,8 @@ observeEvent(input$aggregate_data_btn,{
       shinyWidgets::updatePickerInput(session,
                                       "download_data_col",
                                       # label = "download_data_col",
-                                      choices = c(metrics))
+                                      choices = c(metrics),
+                                      selected = c(metrics))
     } else{
       final_df(NULL)
       shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 30)
@@ -90,7 +124,7 @@ observeEvent(input$aggregate_data_btn,{
       #if(agg_by != '5 minutes'){
       shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 50)
       withProgress(message = 'Aggregating test file.', detail = 'This might take time.\n', value = 0, {
-        agg_df <- df %>%mutate(date_time = as.POSIXct(date_time)) %>%
+        agg_df <- df %>% mutate(date_time = as.POSIXct(date_time)) %>%
           arrange(date_time) %>%
           group_by(metric, run, cage_num) %>%
           # get aggregated time intervals;
@@ -102,54 +136,41 @@ observeEvent(input$aggregate_data_btn,{
 
         agg_df <- agg_df %>%
           group_by(run, cage_num, metric) %>%
+          # get start/end date_times after aggregation
           mutate(start_date =  min(date_time, na.rm = TRUE),
                  end_date = max(date_time, na.rm = TRUE)) %>%
           ungroup() %>% arrange(metric,run, cage_num, date_time) %>%
           # now group by to calculate values
-          group_by(date_time, metric, run, cage_num,start_date, end_date,
-                   file_num_uploaded, subject_id, sex, metadata1, metadata2, study) %>%
+          group_by(date_time, metric, start_date, end_date,
+                   file_num_uploaded, across(colnames(meta_df_c))) %>%
           # cumulative values are going to use max; average everything else
           summarize(value = case_when(all(metric %in% cumulative_metrics) ~
-                                        max(value, na.rm=TRUE),
-                                      TRUE ~ mean(value, na.rm = TRUE))) %>%
+                                        max(raw_n, na.rm=TRUE),
+                                      TRUE ~ mean(raw_n, na.rm = TRUE))) %>%
           ungroup()
         incProgress(1/3, detail = 'Calculating differences.')
 
-        ## create one lag differences for all variables ----
-        diff_df <- agg_df %>%
-          group_by( start_date, end_date,
-                    file_num_uploaded, run, subject_id, sex, metadata1, metadata2, study, metric, cage_num) %>%
-          arrange(date_time) %>%
+        agg_df <- agg_df %>% ungroup() %>%
+          mutate(date_time = as.POSIXct(date_time), # this is unnecessary but if it's not it's going to be a mess
+                 # getting log values which will mostly be used for density plots later
+                 log_value = log1p(value)) %>%
+          group_by(run, cage_num, metric) %>%
+          arrange(metric, run, cage_num, date_time) %>%
           mutate(diff = value - lag(value),
-                 # replace the start values of NA with 0
-                 # to do: maybe remove this row entirely
-                 diff = ifelse(is.na(diff),0,diff)) %>%
-          ungroup() %>% arrange(metric,run, cage_num, date_time) %>%
-          #this is janky, but it works.
-          # create a matching df with the metrics being the metric_diff and going to rbind this to the original df
-          mutate(diff_metric = paste0(metric, '_diff')) %>%
-          as.data.frame() %>%
-          select(-c('metric','value')) %>%
-          rename('metric'='diff_metric','value'='diff')
-
+                 # because I need to make sure I use this and not log(diff(value))
+                 diff_log = log_value - lag(log_value))
 
         incProgress(1/3, detail = 'Finished with aggregation. Formatting columns.')
-        ## join everything, large df
-        aggregated_df <- rbind(agg_df, diff_df) %>%
+        ## format the columns for saving
+        aggregated_df <- agg_df %>%
           ungroup() %>% arrange(metric, run, cage_num, date_time) %>%
           mutate(aggregated_interval = agg_breaks[agg_by],
                  date_time = as.POSIXct(date_time)) %>%
-          group_by(run, cage_num, metric) %>%
-          mutate(start_date =  min(date_time, na.rm = TRUE),
-                 end_date = max(date_time, na.rm = TRUE)) %>%
-          ## forcing these so the download/output$ doesn't accidentally change formatting
-          ## change to anything that has "date" in the colname just make it a character; will cover the above lines
           mutate(across(contains('date'), as.character)) %>%
-          ## make it look pretty in output
-          relocate(value, .after = metric) %>%
-          relocate(run, cage_num, .before = date_time)
-        #change column name to match the aggregation level
-        # rename_with(~agg_col, date_time_agg)
+          mutate(across(is.numeric, round, digits = 4)) %>%
+          relocate(value, diff, .after = metric) %>%
+          relocate(analysis_subject_id, run, cage_num, .before = date_time)
+
       })
       shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 90)
 
@@ -160,18 +181,10 @@ observeEvent(input$aggregate_data_btn,{
                                       "download_data_col",
                                       #label = "download_data_col",
                                       choices = c(metrics),
-                                      #selected = c('all')
+                                      selected = c(metrics)
       )
 
     final_df(aggregated_df)
-
-    # if('light_dark' %in% colnames(final_df())){
-    #   shinyjs::show(id='download_full_data_btn')
-    #   shinyjs::hide(id='download_prom_data_btn')
-    # }else{
-    #   shinyjs::show(id='download_prom_data_btn')
-    #   shinyjs::hide(id='download_full_data_btn')
-    # }
     }
 
   } else{
@@ -273,6 +286,7 @@ observeEvent(input$aggregate_data_btn,{
     ## Meta data read and inner join to prometion ----
 
     req(input$meta_file)
+    req(input$which_column_subject_id1)
     message('Reading meta data file.')
     shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 50)
     withProgress(message = 'Reading meta data file.', value = 0, {
@@ -286,14 +300,17 @@ observeEvent(input$aggregate_data_btn,{
                          validate('Please select a .csv, .xls, or .xlsx file.'))
 
       #fix column names; I don't care what is in this
+      # get analysis_subject_id
       # NEED: run and cage_num
-      meta_df <- meta_dat %>%janitor::clean_names()
+      meta_df <- meta_dat %>%
+        mutate(analysis_subject_id = !!rlang::sym(input$which_column_subject_id1)) %>%
+        janitor::clean_names()
       #print(head(meta_df,2))
 
       req_cols <- c('run'='run number','run'='Run',
                     'cage_num'='cage','cage_num'='cage num','cage_num'='cage_number','cage_num'='cage number',
-                    'meta_date'='date','meta_date'='start_date','meta_date'='')
-      incProgress(1/3, detail = 'Renaming columns')
+                    'meta_date'='date','meta_date'='start_date')
+      incProgress(1/3, detail = 'Renaming columns and creating the analysis_subject_id')
       meta_df_c <- meta_df %>% rename(any_of(req_cols))
 
       if(!('run' %in% colnames(meta_df_c)) & length(input$prom_file$name) == 1){
@@ -342,12 +359,13 @@ observeEvent(input$aggregate_data_btn,{
 
       agg_df <- agg_df %>%
         group_by(run, cage_num, metric) %>%
+        # get start/end date_times after aggregation
         mutate(start_date =  min(date_time, na.rm = TRUE),
                end_date = max(date_time, na.rm = TRUE)) %>%
         ungroup() %>% arrange(metric,run, cage_num, date_time) %>%
         # now group by to calculate values
         group_by(date_time, metric, start_date, end_date,
-                 file_num_uploaded, across(colnames(meta_df_c))) %>%
+                 file_num_uploaded, analysis_subject_id, across(colnames(meta_df_c))) %>%
         # cumulative values are going to use max; average everything else
         summarize(value = case_when(all(metric %in% cumulative_metrics) ~
                                       max(raw_n, na.rm=TRUE),
@@ -355,42 +373,27 @@ observeEvent(input$aggregate_data_btn,{
         ungroup()
       incProgress(1/3, detail = 'Calculating differences.')
 
-      ## create one lag differences for all variables ----
-      diff_df <- agg_df %>%
-        group_by( start_date, end_date,
-                  file_num_uploaded, across(colnames(meta_df_c)), metric, cage_num) %>%
-        arrange(date_time) %>%
+      agg_df <- agg_df %>% ungroup() %>%
+        mutate(date_time = as.POSIXct(date_time), # this is unnecessary but if it's not it's going to be a mess
+               # getting log values which will mostly be used for density plots later
+               log_value = log1p(value)) %>%
+        group_by(run, cage_num, analysis_subject_id,metric) %>%
+        arrange(metric, run, cage_num, analysis_subject_id, date_time) %>%
         mutate(diff = value - lag(value),
-               # replace the start values of NA with 0
-               # to do: maybe remove this row entirely
-               diff = ifelse(is.na(diff),0,diff)) %>%
-        ungroup() %>% arrange(metric,run, cage_num, date_time) %>%
-        #this is janky, but it works.
-        # create a matching df with the metrics being the metric_diff and going to rbind this to the original df
-        mutate(diff_metric = paste0(metric, '_diff')) %>%
-        as.data.frame() %>%
-        select(-c('metric','value')) %>%
-        rename('metric'='diff_metric','value'='diff')
-
+               # because I need to make sure I use this and not log(diff(value))
+               diff_log = log_value - lag(log_value))
 
       incProgress(1/3, detail = 'Finished with aggregation. Formatting columns.')
-      ## join everything, large df
-      aggregated_df <- rbind(agg_df, diff_df) %>%
-        ungroup() %>% arrange(metric, run, cage_num, date_time) %>%
+      ## format the columns for saving
+      aggregated_df <- agg_df %>%
+        ungroup() %>% arrange(metric, run, cage_num, analysis_subject_id, date_time) %>%
         mutate(aggregated_interval = agg_breaks[agg_by],
                date_time = as.POSIXct(date_time)) %>%
-        group_by(run, cage_num, metric) %>%
-        mutate(start_date =  min(date_time, na.rm = TRUE),
-               end_date = max(date_time, na.rm = TRUE)) %>%
-        ## forcing these so the download/output$ doesn't accidentally change formatting
-        # mutate(date_time = as.character(date_time),
-        #        start_date = as.character(start_date),
-        #        end_date = as.character(end_date)) %>%
-        ## change to anything that has "date" in the colname just make it a character; will cover the above lines
         mutate(across(contains('date'), as.character)) %>%
-        ## make it look pretty in output
-        relocate(value, .after = metric) %>%
-        relocate(run, cage_num, .before = date_time)
+        mutate(across(is.numeric, round, digits = 4)) %>%
+        relocate(value, diff, .after = metric) %>%
+        relocate(analysis_subject_id, run, cage_num, .before = date_time)
+
       #change column name to match the aggregation level
       # rename_with(~agg_col, date_time_agg)
     })
@@ -401,9 +404,8 @@ observeEvent(input$aggregate_data_btn,{
 
     shinyWidgets::updatePickerInput(session,
                                     "download_data_col",
-                                    #label = "download_data_col",
                                     choices = c(metrics),
-                                    #selected = c('all')
+                                    selected = c(metrics)
     )
 
 
@@ -439,7 +441,16 @@ observeEvent(input$aggregate_data_btn,{
 
 # add in light/dark phases calc_phases_btn ----
 observeEvent(input$calc_phases_btn,{
+  if(input$auto_file_selection == TRUE){
+    shinyjs::html(id = 'start_light_lab', 'Set Light/Dark Phases? <small>The example data phases have been changed.</small>')
+  } else{
+    shinyjs::html(id = 'start_light_lab', 'Set Light/Dark Phases?')
+  }
+
   shinyjs::hide(id = 'calc_phases_btn')
+  shinyjs::hide(id='data_download_header')
+  shinyjs::hide(id='download_full_data_btn')
+  shinyjs::hide(id='download_prom_data_btn')
   #req(input$aggregate_data_btn > 0)
   message('Adding in light/dark phases')
 
@@ -469,8 +480,8 @@ observeEvent(input$calc_phases_btn,{
         start_in_light = ifelse((date_time == start_date) & (light_on ==1), 1, 0))
     incProgress(1/3, detail = 'still working')
     df_with_phases <- df_with_phases %>%
-      group_by(run, cage_num, metric) %>%
-      arrange(run, cage_num, metric, date_time) %>%
+      group_by(run, cage_num, analysis_subject_id,metric) %>%
+      arrange(run, cage_num, analysis_subject_id, metric, date_time) %>%
       ## this is a mess but it works...
       mutate(## fill in start with NA and replace it with 0; find difference between the current and lag light change; ex:
         # 1,0,0, 1+0=1,

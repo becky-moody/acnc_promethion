@@ -41,6 +41,17 @@ tabPanel(
                            '.xlsx'),
                          multiple = FALSE
                ),
+               selectInput(
+                 inputId = 'which_column_subject_id1',
+                 label = h4('Which column in meta data contains subject ids?',id='sub_col_lab1'),
+                 choices =  character(0),
+                 selected = character(0),
+                 # selectize = TRUE,
+                 # options = list(`actions-box` = TRUE,
+                 #                #`live-search`=TRUE
+                 #                ),
+                 multiple = FALSE
+               ),
                # actionButton(
                #   inputId = "upload_files_btn",
                #   label = "Upload files?", width = '100%'),
@@ -57,13 +68,13 @@ tabPanel(
                actionButton(
                  inputId = "aggregate_data_btn",
                  label = "Upload files and aggregate?", width = '100%'),
-               shinyWidgets::progressBar(id = "file_progress_bar", value = 0, striped = FALSE),
+               shinyWidgets::progressBar(id = "file_progress_bar", value = 0, striped = TRUE),
                br(),
 
                div(id = 'phase_ui',
                tags$hr(style="border-color: black;"),
 
-               h3('Set Light/Dark Phases.'),
+               h3('Set Light/Dark Phases.',id = 'start_light_lab'),
                selectInput(inputId = 'start_light',
                            label = 'What time was the light turned on?',
                            choices = time_selection,
@@ -92,8 +103,7 @@ div(id='data_download_header',
 h3('Download Data.'),
                shinyWidgets::pickerInput(inputId = 'download_data_col',
                                          label = HTML(paste(
-                                           h4('Which metrics?',style = "display: inline;"),
-                                           h6(em("'_diff' metrics are the change between time."),style = "display: inline;"))),
+                                           h4('Which metrics?',style = "display: inline;"))),
                                          choices =  character(0),
                                          selected = character(0),
                                          options = list(
