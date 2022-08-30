@@ -46,7 +46,6 @@ if(input$promethion_app == 'Plot Data'){
 
   ## show and update phase filter if the light_dark col has been calculated
   if('light_dark' %in% final_df_cols){
-    shinyjs::show(id='plot_phase_filter')
     final_df_phases <- unique(final_df()$phase)
 
     #output$ <- renderText(paste0('The light is on from ',input$start_light,' to ', input$end_light,'.'))
@@ -60,6 +59,14 @@ if(input$promethion_app == 'Plot Data'){
                                     "plot_phase_filter",
                                     choices = c(final_df_phases),
                                     selected = c(final_df_phases))
+    shinyjs::show(id='plot_phase_filter')
+
+  } else{
+    shinyWidgets::updatePickerInput(session,
+                                    "plot_phase_filter",
+                                    choices = character(0),
+                                    selected = character(0))
+    shinyjs::hide(id='plot_phase_filter')
   }
 
   observeEvent(input$filter_data_for_plot,{
@@ -101,7 +108,9 @@ if(input$promethion_app == 'Plot Data'){
       }
 
       # this is the only optional filter
-      if(!is.null(input$plot_phase_filter)){
+      df_has_phase <- 'light_dark' %in% final_df_cols
+      if(df_has_phase == TRUE & !is.null(input$plot_phase_filter)){
+        req(input$plot_phase_filter)
         message('Phases: ', input$plot_phase_filter,'\n')
         df <- df %>% filter(phase %in% input$plot_phase_filter)
       }

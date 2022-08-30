@@ -113,9 +113,7 @@ h3('Download Data.'),
                                          #multiple = TRUE,
                                          #choicesOpt = list(style = rep_len('background:#8DEEEE;',length(time_selection)))
                )),
-               br(),
                downloadButton("download_prom_data_btn", "Download file without phases?", width = '100%'),
-               br(),
                downloadButton("download_full_data_btn", "Download file with phases?",width = '100%'),
 br()
   ),# end sidebarPanel

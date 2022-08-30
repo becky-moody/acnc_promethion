@@ -66,11 +66,15 @@ observeEvent(input$auto_file_selection == TRUE,{
                     choices = 'subject_id',
                     selected = 'subject_id')
   updateSelectInput(session, 'aggregate_data', label = 'Change the example data aggregation?')
-  shinyjs::html(id = 'start_light_lab', 'Change Light/Dark Phases? <small>The example data is set from 7:00 to 19:00.</small>')
+
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
 
 # press aggregate_data_btn to read, clean, join files ----
 observeEvent(input$aggregate_data_btn,{
+
+  shinyjs::hide(id='data_download_header')
+  shinyjs::hide(id='download_prom_data_btn')
+  shinyjs::hide(id='download_full_data_btn')
 
   shinyjs::hide(id='aggregate_data_btn')
   shinyjs::show(id='file_progress_bar')
@@ -87,109 +91,102 @@ observeEvent(input$aggregate_data_btn,{
   # saved file from doing this
 
   ## testing file based on check box ----
+  #final_df(readxl::read_xlsx(here::here('data/promethion_cleaned_5minutes_2022-07-26.xlsx')))
+  # shinyjs::hide(id='prom_file')
+  # shinyjs::hide(id='meta_file')
+  # shinyjs::show(id='auto_file_notes')
+  shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 10)
 
-  if(input$auto_file_selection == TRUE){
-    #final_df(readxl::read_xlsx(here::here('data/promethion_cleaned_5minutes_2022-07-26.xlsx')))
-    # shinyjs::hide(id='prom_file')
-    # shinyjs::hide(id='meta_file')
-    # shinyjs::show(id='auto_file_notes')
-    shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 10)
+  if(input$auto_file_selection == TRUE & input$aggregate_data == '5 minutes'){
+    message('Using test data by 5 mins, no need to run.')
+    final_df(NULL)
     df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-25.csv'))
 
-    if(input$aggregate_data == '5 minutes'){
-      message('Using test data by 5 mins, no need to run.')
-      final_df(df)
+    final_df(df)
 
-      metrics <- unique(df$metric)
 
-      shinyWidgets::updatePickerInput(session,
-                                      "download_data_col",
-                                      # label = "download_data_col",
-                                      choices = c(metrics),
-                                      selected = c(metrics))
-    } else{
-      final_df(NULL)
-      shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 30)
+    shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 60)
+    shinyjs::html(id = 'start_light_lab', 'Change Light/Dark Phases? <small>The example data is set from 7:00 to 19:00.</small>')
 
-      agg_by <- input$aggregate_data
-      #print(agg_by)
-      message('Aggregating data by ', agg_by)
-      # only the minutes makes needed; cant do cut(time, '30 minutes')
-      agg_breaks <- c('5 minutes'= '5 min', '30 minutes'='30 min', '1 hour'='1 hour', '6 hours'='6 hour')
-      agg_col <- paste0('date_time_', gsub(' ','', agg_by))
+  } else if(input$auto_file_selection == TRUE & input$aggregate_data != '5 minutes'){
+    shinyjs::html(id = 'start_light_lab', 'Set Light/Dark Phases?')
 
-      cumulative_metrics <- c('foodupa','waterupa','pedmeters','allmeters')
+    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-25.csv'))
 
-      ## if by anything other than 5 minutes then aggregate data and then find differences
-      #if(agg_by != '5 minutes'){
-      shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 50)
-      withProgress(message = 'Aggregating test file.', detail = 'This might take time.\n', value = 0, {
-        agg_df <- df %>% mutate(date_time = as.POSIXct(date_time)) %>%
-          arrange(date_time) %>%
-          group_by(metric, run, cage_num) %>%
-          # get aggregated time intervals;
-          mutate(date_time = cut(date_time, agg_breaks[agg_by]),
-                 date_time = as.POSIXct(date_time))
+    final_df(NULL)
+    shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 30)
 
-        incProgress(1/3, detail = paste0('Breaking datetimes by ',agg_breaks[agg_by],'.'))
-        # exclude missing
+    agg_by <- input$aggregate_data
+    #print(agg_by)
+    message('Aggregating data by ', agg_by)
+    # only the minutes makes needed; cant do cut(time, '30 minutes')
+    agg_breaks <- c('5 minutes'= '5 min', '30 minutes'='30 min', '1 hour'='1 hour', '6 hours'='6 hour')
+    agg_col <- paste0('date_time_', gsub(' ','', agg_by))
 
-        agg_df <- agg_df %>%
-          group_by(run, cage_num, metric) %>%
-          # get start/end date_times after aggregation
-          mutate(start_date =  min(date_time, na.rm = TRUE),
-                 end_date = max(date_time, na.rm = TRUE)) %>%
-          ungroup() %>% arrange(metric,run, cage_num, date_time) %>%
-          # now group by to calculate values
-          group_by(date_time, metric, start_date, end_date,
-                   file_num_uploaded, across(colnames(meta_df_c))) %>%
-          # cumulative values are going to use max; average everything else
-          summarize(value = case_when(all(metric %in% cumulative_metrics) ~
-                                        max(raw_n, na.rm=TRUE),
-                                      TRUE ~ mean(raw_n, na.rm = TRUE))) %>%
-          ungroup()
-        incProgress(1/3, detail = 'Calculating differences.')
+    cumulative_metrics <- c('foodupa','waterupa','pedmeters','allmeters')
 
-        agg_df <- agg_df %>% ungroup() %>%
-          mutate(date_time = as.POSIXct(date_time), # this is unnecessary but if it's not it's going to be a mess
-                 # getting log values which will mostly be used for density plots later
-                 log_value = log1p(value)) %>%
-          group_by(run, cage_num, metric) %>%
-          arrange(metric, run, cage_num, date_time) %>%
-          mutate(diff = value - lag(value),
-                 # because I need to make sure I use this and not log(diff(value))
-                 diff_log = log_value - lag(log_value))
+    ## if by anything other than 5 minutes then aggregate data and then find differences
+    #if(agg_by != '5 minutes'){
+    shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 50)
+    withProgress(message = 'Aggregating test file.', detail = 'This might take time.\n', value = 0, {
+      agg_df <- df %>% mutate(date_time = as.POSIXct(date_time)) %>%
+        arrange(date_time) %>%
+        group_by(metric, run, cage_num) %>%
+        # get aggregated time intervals;
+        mutate(date_time = cut(date_time, agg_breaks[agg_by]),
+               date_time = as.POSIXct(date_time))
 
-        incProgress(1/3, detail = 'Finished with aggregation. Formatting columns.')
-        ## format the columns for saving
-        aggregated_df <- agg_df %>%
-          ungroup() %>% arrange(metric, run, cage_num, date_time) %>%
-          mutate(aggregated_interval = agg_breaks[agg_by],
-                 date_time = as.POSIXct(date_time)) %>%
-          mutate(across(contains('date'), as.character)) %>%
-          mutate(across(is.numeric, round, digits = 4)) %>%
-          relocate(value, diff, .after = metric) %>%
-          relocate(analysis_subject_id, run, cage_num, .before = date_time)
+      incProgress(1/3, detail = paste0('Breaking datetimes by ',agg_breaks[agg_by],'.'))
+      # exclude missing
 
-      })
-      shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 90)
+      agg_df <- agg_df %>%
+        group_by(run, cage_num, metric) %>%
+        # get start/end date_times after aggregation
+        mutate(start_date =  min(date_time, na.rm = TRUE),
+               end_date = max(date_time, na.rm = TRUE)) %>%
+        ungroup() %>% arrange(metric,run, cage_num, date_time) %>%
+        # now group by to calculate values
+        group_by(date_time, metric, start_date, end_date,
+                 file_num_uploaded, analysis_subject_id, run, cage_num,
+                 subject_id, sex, metadata1, metadata2, study, meta_date)%>%
+        # cumulative values are going to use max; average everything else
+        summarize(value = case_when(metric %in% cumulative_metrics ~#all(metric %in% cumulative_metrics) ~
+                                      max(value, na.rm=TRUE),
+                                    TRUE ~ mean(value, na.rm = TRUE))) %>%
+        ungroup()
+      incProgress(1/3, detail = 'Calculating differences.')
 
-      # Update download columns selections ----
-      metrics <- unique(aggregated_df$metric)
+      agg_df <- agg_df %>% ungroup() %>%
+        mutate(date_time = as.POSIXct(date_time), # this is unnecessary but if it's not it's going to be a mess
+               # getting log values which will mostly be used for density plots later
+               log_value = log1p(value)) %>%
+        group_by(run, cage_num, metric) %>%
+        arrange(metric, run, cage_num, date_time) %>%
+        mutate(diff = value - lag(value),
+               # because I need to make sure I use this and not log(diff(value))
+               diff_log = log_value - lag(log_value))
 
-      shinyWidgets::updatePickerInput(session,
-                                      "download_data_col",
-                                      #label = "download_data_col",
-                                      choices = c(metrics),
-                                      selected = c(metrics)
-      )
+      incProgress(1/3, detail = 'Finished with aggregation. Formatting columns.')
+      ## format the columns for saving
+      aggregated_df <- agg_df %>%
+        ungroup() %>% arrange(metric, run, cage_num, date_time) %>%
+        mutate(aggregated_interval = agg_breaks[agg_by],
+               date_time = as.POSIXct(date_time)) %>%
+        mutate(across(contains('date'), as.character)) %>%
+        mutate(across(where(is.numeric), round, digits = 4)) %>%
+        relocate(value, diff, .after = metric) %>%
+        relocate(analysis_subject_id, run, cage_num, .before = date_time)
+
+    }) # end withprogress
 
     final_df(aggregated_df)
-    }
 
-  } else{
+  } else if (input$auto_file_selection == FALSE){
     ## begin reading promethion files one at a time ----
     req(input$prom_file)
+    req(input$meta_file)
+    final_df(NULL)
+
     n_prom_files <- length(input$prom_file$name)
     message('There are ', n_prom_files, ' files uploaded.')
 
@@ -210,7 +207,7 @@ observeEvent(input$aggregate_data_btn,{
                       csv = read.csv(input$prom_file$datapath[i]),
                       xls = readxl::read_xls(input$prom_file$datapath[i]),
                       xlsx = readxl::read_xlsx(input$prom_file$datapath[i]),
-                      validate('If file is .xml, save as .xlsx in Excel. Otherwise upload a .csv.'))
+                      validate('If file is .xml, open in Excel and save the "CalR" tab as an .xlsx or .csv. Otherwise upload a .csv.'))
 
         ####################################
         # manual testing;
@@ -285,7 +282,6 @@ observeEvent(input$aggregate_data_btn,{
 
     ## Meta data read and inner join to prometion ----
 
-    req(input$meta_file)
     req(input$which_column_subject_id1)
     message('Reading meta data file.')
     shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 50)
@@ -327,7 +323,7 @@ observeEvent(input$aggregate_data_btn,{
       message('Finished combining meta data and promethion file.')
       print(head(df, 2))
       #df
-    })
+    }) # end withprogress
 
 
     ## start aggregation and force to ts type
@@ -347,7 +343,7 @@ observeEvent(input$aggregate_data_btn,{
     #if(agg_by != '5 minutes'){
     shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 70)
     withProgress(message = 'Aggregating file.', detail = 'This might take time.\n', value = 0, {
-      agg_df <- df %>%mutate(date_time = as.POSIXct(date_time)) %>%
+      agg_df <- df %>% mutate(date_time = as.POSIXct(date_time)) %>%
         arrange(date_time) %>%
         group_by(metric, run, cage_num) %>%
         # get aggregated time intervals;
@@ -396,23 +392,22 @@ observeEvent(input$aggregate_data_btn,{
 
       #change column name to match the aggregation level
       # rename_with(~agg_col, date_time_agg)
+      final_df(aggregated_df)
     })
-    shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 90)
+  } else{
+    final_df(NULL)
+  }
 
-    # Update download columns selections ----
-    metrics <- unique(aggregated_df$metric)
+  shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 90)
 
-    shinyWidgets::updatePickerInput(session,
-                                    "download_data_col",
-                                    choices = c(metrics),
-                                    selected = c(metrics)
-    )
-
-
-    message('Finished calculating aggregations and differences')
-    # Assign to final_df variable
-    final_df(aggregated_df)
-  } # end else
+  # Update download columns selections ----
+  # metrics <- ifelse(!is.null(final_df()), unique(final_df()$metric), NULL)
+  #
+  # shinyWidgets::updatePickerInput(session,
+  #                                 "download_data_col",
+  #                                 #label = "download_data_col",
+  #                                 choices = c(metrics),
+  #                                 selected = c(metrics))
   Sys.sleep(.1)
   shinyjs::hide(id='file_progress_bar')
   shinyjs::show(id='aggregate_data_btn')
@@ -431,6 +426,17 @@ observeEvent(input$aggregate_data_btn,{
 #   shinyjs::show(id='download_prom_data_btn')
 }, ignoreInit = TRUE)
 
+observeEvent(final_df(),{
+  req(!is_null(final_df()))
+  #metrics <- ifelse(!is.null(final_df()), unique(final_df()$metric), NULL)
+  metrics <- unique(final_df()$metric)
+  shinyWidgets::updatePickerInput(session,
+                                  "download_data_col",
+                                  #label = "download_data_col",
+                                  choices = c(metrics),
+                                  selected = c(metrics))
+})
+
 observeEvent(input$aggregate_data_btn,{
   if(input$aggregate_data %in% c('5 minutes', '30 minutes')){
     shinyjs::show(id='phase_ui')
@@ -441,12 +447,7 @@ observeEvent(input$aggregate_data_btn,{
 
 # add in light/dark phases calc_phases_btn ----
 observeEvent(input$calc_phases_btn,{
-  if(input$auto_file_selection == TRUE){
-    shinyjs::html(id = 'start_light_lab', 'Set Light/Dark Phases? <small>The example data phases have been changed.</small>')
-  } else{
-    shinyjs::html(id = 'start_light_lab', 'Set Light/Dark Phases?')
-  }
-
+  shinyjs::html(id = 'start_light_lab', 'Set Light/Dark Phases?')
   shinyjs::hide(id = 'calc_phases_btn')
   shinyjs::hide(id='data_download_header')
   shinyjs::hide(id='download_full_data_btn')
@@ -541,7 +542,7 @@ output$all_prom_files <- DT::renderDataTable(head(final_df(),20),
 download_df <- reactive({
   df <- final_df()
   if(!is.null(df) & !is.null(input$download_data_col)){
-    df %>% filter(metric %in% input$download_data_col)
+    df %>% dplyr::filter(metric %in% input$download_data_col)
   } else{
     return("No metrics selected")
   }
