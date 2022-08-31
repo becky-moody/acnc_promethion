@@ -97,7 +97,8 @@ actionButton(inputId='run_plot', label = 'Plot the data.', width = '100%'),
                    ),
                    conditionalPanel(
                      condition = "input.plot_type == 'plot_boxplot'",
-                     plotOutput('filtered_prom_boxplot')
+                     #plotOutput('filtered_prom_boxplot')
+                     plotly::plotlyOutput('filtered_prom_boxplot')
                    )
 
                    #plotOutput('filtered_prom_plot')

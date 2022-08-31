@@ -19,7 +19,7 @@ tabPanel(
                fileInput("prom_file",
                          HTML(paste0(
                            h3("Choose Promethion Files"),
-                           h6(em("If file is .xml, open in Excel and save as .xlsx."), style = "font-size:12px;"))),
+                           h6(em("If file is .xml, open in Excel and save the 'CalR' sheet as .xlsx or .csv."), style = "font-size:12px;"))),
                          accept = c(
                            # "text/csv",
                            # "text/comma-separated-values,text/plain",

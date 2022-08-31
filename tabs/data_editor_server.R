@@ -100,7 +100,7 @@ observeEvent(input$aggregate_data_btn,{
   if(input$auto_file_selection == TRUE & input$aggregate_data == '5 minutes'){
     message('Using test data by 5 mins, no need to run.')
     final_df(NULL)
-    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-25.csv'))
+    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-31.csv'))
 
     final_df(df)
 
@@ -111,7 +111,7 @@ observeEvent(input$aggregate_data_btn,{
   } else if(input$auto_file_selection == TRUE & input$aggregate_data != '5 minutes'){
     shinyjs::html(id = 'start_light_lab', 'Set Light/Dark Phases?')
 
-    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-25.csv'))
+    df <- read.csv(here::here('example data/promethion_cleaned_with_phases_5minutes_2022-08-31.csv'))
 
     final_df(NULL)
     shinyWidgets::updateProgressBar(session, id = 'file_progress_bar', value = 30)
@@ -140,6 +140,8 @@ observeEvent(input$aggregate_data_btn,{
       # exclude missing
 
       agg_df <- agg_df %>%
+        # I don't think there are ever any negatives so forcing them to 0
+        mutate(value = ifelse(value < 0, 0, value)) %>%
         group_by(run, cage_num, metric) %>%
         # get start/end date_times after aggregation
         mutate(start_date =  min(date_time, na.rm = TRUE),
@@ -354,6 +356,8 @@ observeEvent(input$aggregate_data_btn,{
       # exclude missing
 
       agg_df <- agg_df %>%
+        # I don't think there are ever any negatives so forcing them to 0
+        mutate(raw_n = ifelse(raw_n < 0, 0, raw_n)) %>%
         group_by(run, cage_num, metric) %>%
         # get start/end date_times after aggregation
         mutate(start_date =  min(date_time, na.rm = TRUE),

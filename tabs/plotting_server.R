@@ -107,12 +107,13 @@ if(input$promethion_app == 'Plot Data'){
         df <- df %>% filter(metric == sample(metrics,1))
       }
 
-      # this is the only optional filter
-      df_has_phase <- 'light_dark' %in% final_df_cols
-      if(df_has_phase == TRUE & !is.null(input$plot_phase_filter)){
-        req(input$plot_phase_filter)
-        message('Phases: ', input$plot_phase_filter,'\n')
-        df <- df %>% filter(phase %in% input$plot_phase_filter)
+      if('light_dark' %in% colnames(df)){
+        if(!is.null(input$plot_phase_filter)){
+          message('Phases: ', input$plot_phase_filter,'\n')
+          df <- df %>% filter(phase %in% input$plot_phase_filter)
+        } else{
+          df <- NULL
+        }
       }
 
       shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 95)
@@ -235,14 +236,15 @@ observeEvent(input$run_plot,{
       message('Building plot')
       p <-ggplot(use_this_df_for_plot, aes(x=phase, y = plot_value,
                                            group = phase, fill = light_dark, color = light_dark)) +
-        gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
-        gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
-                                   scale = 3)+
+        geom_boxplot()+
+        # gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
+        # gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
+        #                            scale = 3)+
         scale_fill_manual(values = fill_color, guide = 'none') +
         scale_color_manual(values = color_color, guide = 'none')+
         theme_minimal() +
         labs(x = 'Phases', y=y_axis_name, caption = build_caption) +
-        facet_grid(rows = 'analysis_subject_id' ,scales = 'free_y') +
+        facet_grid(rows = 'analysis_subject_id' ,scales = 'free') +
         theme(panel.spacing = unit(.05, "lines"),
               panel.border = element_rect(color = "black", fill = NA, size = .5),
               strip.background = element_rect(color = "black", size = .5))
@@ -253,12 +255,13 @@ observeEvent(input$run_plot,{
       message('Building plot')
 
       p <-ggplot(use_this_df_for_plot, aes(x=0,y = plot_value, color = analysis_subject_id)) +
-        gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
-        gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
-                                   scale = 3)+
+        geom_boxplot()+
+        # gghalves::geom_half_boxplot(nudge =.02, outlier.alpha = .8, outlier.size = .8, outlier.colour = "#CD2626" ) +
+        # gghalves::geom_half_violin(side = 'r',position = "identity", trim = TRUE, nudge = .02,
+        #                            scale = 3)+
         theme_minimal() +
         labs(x = '', y=y_axis_name, caption = build_caption) +
-        facet_grid(rows = 'analysis_subject_id' ,scales = 'free_y') +
+        facet_grid(rows = 'analysis_subject_id' ,scales = 'free') +
         theme(panel.spacing = unit(.05, "lines"),
               panel.border = element_rect(color = "black", fill = NA, size = .5),
               strip.background = element_rect(color = "black", size = .5))
@@ -267,9 +270,11 @@ observeEvent(input$run_plot,{
     } else{
       p <- NULL
     }
-    plot_p <- p
+    plot_p <- plotly::ggplotly(p)
     shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 80)
-    output$filtered_prom_boxplot <- renderPlot(plot_p)
+    #output$filtered_prom_boxplot <- renderPlot(plot_p)
+    output$filtered_prom_boxplot <- plotly::renderPlotly(plot_p)
+    #output$filtered_prom_ts_plot <- plotly::renderPlotly(plot_p)
 
     ################################################################################
   } else if(input$plot_type == 'plot_ts'){
@@ -280,13 +285,13 @@ observeEvent(input$run_plot,{
       message('Getting line breaks for phases')
       ### line breaks for light/dark switches (geom_vline)----
       phase_changes <- use_this_df_for_plot %>% group_by(metric) %>%
-        mutate(max_value = max(plot_value),
-               min_value = min(plot_value)) %>% ungroup() %>%
+        mutate(max_value = max(plot_value, na.rm = TRUE),
+               min_value = min(plot_value, na.rm = TRUE)) %>% ungroup() %>%
         mutate(value_range = max_value - min_value,
                # adjust text so it doesn't hang off, not sure if this will work for every one
                text_placement = value_range * (2/3)+min_value) %>%
         group_by(metric, phase_num, phase, max_value,text_placement) %>%
-        summarise(min_dt = min(date_time))
+        summarise(min_dt = min(date_time, na.rm = TRUE))
 
       message('Getting background for phases')
       ## background for light/dark (geom_rect) ----
