@@ -161,7 +161,7 @@ observeEvent(input$run_plot,{
       if(input$plot_log_transformation == TRUE){
         #### log transformed user chose: diff_log ----
         use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff_log)
-        y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences of ln(value + 1) transformation')
+        y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences of\nln(value + 1) transformation')
         build_caption <- "Forced conversion to 1 lag difference of ln(value + 1) transformed values of this cumulative metric. Raw cumulative values can be viewed as 'Line over time'."
       } else{
         ### not log transformed forcing difference: diff ----
@@ -175,7 +175,7 @@ observeEvent(input$run_plot,{
       if(input$plot_log_transformation == TRUE & input$plot_diff_metrics == TRUE){
         #### log transformed difference : diff_log ----
       use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff_log)
-      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences of ln(value + 1) transformation')
+      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' differences of\nln(value + 1) transformation')
       build_caption <- 'User chose 1 lag differences of ln(value + 1) transformed values.'
       } else if(input$plot_log_transformation == FALSE & input$plot_diff_metrics == TRUE){
         #### difference : diff ----
@@ -191,7 +191,7 @@ observeEvent(input$run_plot,{
         #### raw values ----
         use_this_df_for_plot <- plot_df() %>% mutate(plot_value = value)
         y_axis_name <- paste0(unique(use_this_df_for_plot$metric))
-        build_caption <- NA
+        build_caption <- ''
       }
     }
   } else if(input$plot_type == 'plot_ts'){
@@ -199,7 +199,7 @@ observeEvent(input$run_plot,{
     if(input$plot_log_transformation == TRUE & input$plot_diff_metrics == TRUE){
       #### log transformed difference : diff_log ----
       use_this_df_for_plot <- plot_df() %>% mutate(plot_value = diff_log)
-      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' difference of ln(value + 1) transformation')
+      y_axis_name <- paste0(unique(use_this_df_for_plot$metric), ' difference of\nln(value + 1) transformation')
       build_caption <- 'User chose 1 lag differences of ln(value + 1) transformed values.'
     } else if(input$plot_log_transformation == FALSE & input$plot_diff_metrics == TRUE){
       #### difference : diff ----
@@ -215,13 +215,13 @@ observeEvent(input$run_plot,{
       #### raw values ----
       use_this_df_for_plot <- plot_df() %>% mutate(plot_value = value)
       y_axis_name <- paste0(unique(use_this_df_for_plot$metric))
-      build_caption <- NA
+      build_caption <- ''
     }
   } else{ # end plot type
     ## else raw values ----
     use_this_df_for_plot <- plot_df() %>% mutate(plot_value = value)
     y_axis_name <- paste0(unique(use_this_df_for_plot$metric))
-    build_caption <- NA
+    build_caption <- ''
   }
 
   if(input$plot_type == 'plot_boxplot'){
@@ -270,7 +270,15 @@ observeEvent(input$run_plot,{
     } else{
       p <- NULL
     }
-    plot_p <- plotly::ggplotly(p)
+    plot_p <- plotly::ggplotly(p)%>%
+      plotly::layout(title = list(text = build_caption, font = list(size = 12)),
+                     margin = list(l = 100))
+      # plotly::layout(annotations =
+      #          list(x = 1, y = -.18, text = build_caption,
+      #               showarrow = F, xref='paper', yref='paper',
+      #               xanchor='right', #yanchor='auto',
+      #               xshift=0, yshift=0,
+      #               font=list(size=10)))
     shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 80)
     #output$filtered_prom_boxplot <- renderPlot(plot_p)
     output$filtered_prom_boxplot <- plotly::renderPlotly(plot_p)
@@ -333,7 +341,8 @@ observeEvent(input$run_plot,{
                        text = paste0('Date time: ', date_time, '  (',phase,')',
                                      '\nStudy Subject ID: ', analysis_subject_id,
                                      '</br>Metric: ', metric,
-                                     '\nValue: ', round(plot_value,4))))
+                                     '\nValue: ', round(plot_value,4))))+
+        theme(legend.position="bottom")
 
       rm(y_axis_name, shaded_rect, phase_changes) ## clean up
       message('Finished with plot \n')
@@ -351,7 +360,9 @@ observeEvent(input$run_plot,{
     }else{
       p <- NULL
     }
-    plotly_p <- plotly::ggplotly(p, tooltip = c('text'))
+    plotly_p <- plotly::ggplotly(p, tooltip = c('text'))%>%
+      plotly::layout(title = list(text = build_caption, font = list(size = 12)),
+                     margin = list(l = 100))
 
     shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 80)
     output$filtered_prom_ts_plot <- plotly::renderPlotly(plotly_p)
