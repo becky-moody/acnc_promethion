@@ -21,7 +21,7 @@ tabPanel('Plot Data',
                           tags$hr(style="border-color: black;"),
                           shinyWidgets::pickerInput(inputId = 'plot_animal_filter',
                                                     label = HTML(paste(
-                    h4('Which subject(s)?',style = "display: inline;"),p(em('Plotting over time might become slow with many subjects.'), style = 'display: inline;'))),
+                    h4('Which subject(s)?',style = "display: inline;"),h6(em('Plotting might become slow with many subjects.'), style = 'display: inline;'))),
                                                     choices =  character(0),
                                                     selected = character(0),
                                                     options = list(
@@ -99,7 +99,10 @@ actionButton(inputId='run_plot', label = 'Plot the data.', width = '100%'),
                      condition = "input.plot_type == 'plot_boxplot'",
                      #plotOutput('filtered_prom_boxplot')
                      plotly::plotlyOutput('filtered_prom_boxplot')
-                   )
+                   ),
+                   br(),
+
+                   downloadButton("download_filt_plot_data", "Download this filtered data?")
 
                    #plotOutput('filtered_prom_plot')
                    #plotly::plotlyOutput('filtered_prom_plot')

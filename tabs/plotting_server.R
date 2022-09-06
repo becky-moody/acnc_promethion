@@ -16,6 +16,7 @@ if(input$promethion_app == 'Plot Data'){
     shinyjs::hide(id='run_plot_selections')
     shinyjs::hide(id='run_plot')
     shinyjs::hide(id='outliers_plot')
+    shinyjs::hide(id='download_filt_plot_data')
 
   } else{
 
@@ -25,6 +26,7 @@ if(input$promethion_app == 'Plot Data'){
     shinyjs::hide(id='run_plot_selections')
     shinyjs::hide(id='run_plot')
     shinyjs::hide('outliers_plot')
+    shinyjs::hide('download_filt_plot_data')
 
   req(!is.null(final_df()))
   final_df_cols <- colnames(final_df())
@@ -126,6 +128,8 @@ if(input$promethion_app == 'Plot Data'){
       shinyjs::show(id='run_plot_selections')
       shinyjs::show(id='run_plot')
 
+      df <- df %>% mutate(analysis_subject_id = as.factor(analysis_subject_id))
+
     plot_df(df)
 
   }, ignoreInit = TRUE)
@@ -133,10 +137,12 @@ if(input$promethion_app == 'Plot Data'){
   } # end hide/show else based on if data has been uploaded
 
 
+
 observeEvent(input$run_plot,{
   req(nrow(plot_df())>0)
   shinyjs::hide(id='run_plot')
   shinyjs::show(id='plot_filter_progress')
+  shinyjs::hide(id = 'download_filt_plot_df')
   shinyWidgets::updateProgressBar(session, id = 'plot_filter_progress', value = 20)
 
   plotly_p <- NA
@@ -292,13 +298,13 @@ observeEvent(input$run_plot,{
 
       message('Getting line breaks for phases')
       ### line breaks for light/dark switches (geom_vline)----
-      phase_changes <- use_this_df_for_plot %>% group_by(metric) %>%
+      phase_changes <- use_this_df_for_plot %>% group_by(metric, analysis_subject_id) %>%
         mutate(max_value = max(plot_value, na.rm = TRUE),
                min_value = min(plot_value, na.rm = TRUE)) %>% ungroup() %>%
         mutate(value_range = max_value - min_value,
                # adjust text so it doesn't hang off, not sure if this will work for every one
                text_placement = value_range * (2/3)+min_value) %>%
-        group_by(metric, phase_num, phase, max_value,text_placement) %>%
+        group_by(metric, analysis_subject_id, phase_num, phase, max_value, text_placement) %>%
         summarise(min_dt = min(date_time, na.rm = TRUE))
 
       message('Getting background for phases')
@@ -308,9 +314,9 @@ observeEvent(input$run_plot,{
         mutate(y_max = max(plot_value, na.rm = TRUE),
                y_min = min(plot_value, na.rm= TRUE),
                y_min = ifelse(y_min == 0, 0, y_min)) %>%
-        group_by(metric, light_dark, phase_num, y_max, y_min) %>%
-        summarise(start_time = min(date_time, na.rm = TRUE),
-                  end_time = max(date_time, na.rm = TRUE)) %>%
+        group_by(metric, analysis_subject_id, light_dark, phase_num, y_max, y_min) %>%
+        summarise(start_rect = min(date_time, na.rm = TRUE),
+                  end_rect = max(date_time, na.rm = TRUE)) %>%
         ungroup()
 
       message('Building plot')
@@ -323,11 +329,12 @@ observeEvent(input$run_plot,{
         # set axis names
         labs(x = 'Date Time', y = y_axis_name, caption = build_caption) +
         # build background light/dark
-        geom_rect(data = shaded_rect, aes(xmin = start_time,
-                                          xmax = end_time,
+        geom_rect(data = shaded_rect, aes(xmin = start_rect,
+                                          xmax = end_rect,
                                           ymin = y_min,
                                           ymax = y_max,
-                                          fill = light_dark),
+                                          fill = light_dark,
+                                          group = analysis_subject_id),
                   alpha = .75, stat = 'identity')+
         # set background colors
         scale_fill_manual(values = fill_color) +
@@ -371,8 +378,27 @@ observeEvent(input$run_plot,{
   Sys.sleep(.1)
   shinyjs::hide(id='plot_filter_progress')
   shinyjs::show(id='run_plot')
+  shinyjs::show(id = 'download_filt_plot_data')
 
 }, ignoreInit = TRUE) # end observeEvent run_plot
+}
+
+download_filter_plot_df <- reactive({
+  if(!is.null(plot_df())){
+    plot_df()
+  } else{
+    message('No data selected yet')
+  }
+})
+
+output$download_filt_plot_data <- downloadHandler(
+  filename = function(){
+    paste('promethion_filtered_plot_data_',Sys.Date(),'.csv', sep = '')
+  },
+  content = function(file){
+    write.csv(x = download_filter_plot_df(), file, row.names= FALSE)
+  }
+  )
 #
 
 
@@ -529,8 +555,6 @@ observeEvent(input$run_plot,{
 #
 # output$filtered_prom_boxplot <- renderPlot(plot_boxplot_ob())
 
-
-}
 
 ############## old
   # observeEvent(input$plot_selected_as_violin,{
